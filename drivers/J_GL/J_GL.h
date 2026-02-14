@@ -57,6 +57,21 @@ typedef enum {
 #define ARDUINO_SPI_NODE DT_NODELABEL(arduino_spi)
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
+#define RAM_DATA_DIV 4
+#define RAM_DATA_SIZE (LCD_MAX_LENGTH+1)*(LCD_MAX_HEIGHT+1)*3/RAM_DATA_DIV
+#define MAX_SPI_CHUNK_SIZE 30000
+
+
+// Font sizes
+static uint8_t font_length[3] = {7,11,16};
+static uint8_t font_height[3] = {10,18,26};
+static uint16_t* font_ptr[3] = {Font7x10,Font11x18,Font16x26};
+
+typedef enum {
+  FONT_SMALL = 0,
+  FONT_MEDIUM,
+  FONT_LARGE
+} j_font_size;
 struct J_CONTAINER {
   const struct device* dev_spi;
   const struct device* dev_i2c;
@@ -64,6 +79,16 @@ struct J_CONTAINER {
   const struct gpio_dt_spec* dcx_gpio;
   uint16_t* bounds;
 };
+
+typedef enum {
+  BLACK = 0x00000000,
+  WHITE = 0x00FFFFFF,
+  RED = 0x00FF0000,
+  GREEN = 0x0000FF00,
+  BLUE = 0x000000FF,
+  MAGENTA = 0x00FF00FF,
+  YELLOW = 0x00FFFF00
+} j_color;
 
 
 /**
@@ -77,13 +102,14 @@ struct J_CONTAINER {
  * 
  */
 void J_init(const struct device* dev_spi, const struct device* dev_i2c, const struct spi_config* spi_cfg, const struct gpio_dt_spec* dcx_gpio, uint16_t* bounds);
+void J_LCD_init();
 
 void lcd_cmd(uint8_t cmd, struct spi_buf * data);
 
 /**
  * @brief Draw color on screen, respects current bounds.
  */
-int draw_color_fs(uint8_t* RGB666_COLOR);
+int draw_color_fs(j_color COLOR);
 
 /**
  * @brief Set the bounds of the LCD display
@@ -97,5 +123,9 @@ uint32_t get_pos();
 void draw_square(uint16_t x, uint16_t y, uint16_t size);
 int draw_circle(uint16_t x, uint16_t y, uint16_t radius);
 void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
+void ram_load(const uint8_t* data, size_t len);
+void ram_draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
+int draw_text(char ch, uint8_t font_size, j_color FILL_COL);
+
 
 #endif

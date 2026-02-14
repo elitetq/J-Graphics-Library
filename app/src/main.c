@@ -57,18 +57,13 @@ int main(void) {
     return 0;
   
   J_init(dev,dev_i2c,&spi_cfg,&dcx_gpio,bounds);
+  J_LCD_init();
 
-  lcd_cmd(CMD_SOFTWARE_RESET,NULL);
-  k_msleep(120);
-  lcd_cmd(CMD_SLEEP_OUT,NULL);
-  lcd_cmd(CMD_DISPLAY_ON,NULL);
-  uint8_t R, G, B;
-  set_bounds((uint16_t[]){0,LCD_MAX_HEIGHT,0,LCD_MAX_LENGTH});
-  draw_color_fs((uint8_t[]){0x00,0x00,0xFF});
-  k_msleep(1000);
+  //draw_color_fs(YELLOW);
   draw_image(0,0,img3);
+  k_msleep(1000);
 
-  while(0) {
+  while(1) {
     uint8_t touch_response;
     uint16_t x_pos, y_pos;
     uint32_t position;

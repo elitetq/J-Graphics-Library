@@ -23,13 +23,15 @@ if __name__ == '__main__':
         
     f.write(f'const uint8_t {array_name}[] = ' + '{')
     f.write(f'0x{(rows & hex_mask) >> 8:02X},0x{(rows & ~hex_mask):02X},0x{(columns & hex_mask) >> 8:02X},0x{(columns & ~hex_mask):02X},\n')
+    print(img)
     for i, pixel in enumerate(img):
-        for j, pixel_dat in enumerate(pixel):
+        pixel_reversed = pixel[::-1]
+        for j, pixel_dat in enumerate(pixel_reversed):
             R_val = ((int)(pixel_dat[0] * 63) // 255) << 2
             G_val = ((int)(pixel_dat[1] * 63) // 255) << 2
             B_val = ((int)(pixel_dat[2] * 63) // 255) << 2
             #data += f'0x{R_val:02X},0x{G_val:02X},0x{B_val:02X},'
-            f.write(f'0x{R_val:02X},0x{G_val:02X},0x{B_val:02X}')
+            f.write(f'0x{B_val:02X},0x{G_val:02X},0x{R_val:02X}')
             if(not (i == rows - 1 and j == columns - 1)):
                 f.write(',')
             if((j+1+i*rows) % 3 == 0 and not (i == rows - 1 and j == columns - 1)):
