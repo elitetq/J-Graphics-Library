@@ -19,6 +19,7 @@
 #define BOX_SIZE (uint16_t)20
 
 
+
 // LOW_HEIGHT - MAX_HEIGHT - LOW_LENGTH - MAX_LENGTH
 static uint16_t bounds[4] = {0x0000,LCD_MAX_HEIGHT,0x0000,LCD_MAX_LENGTH};
 static uint8_t column_array[4] = {(uint8_t)(0x0000>>8),(uint8_t)0x0000,(uint8_t)(LCD_MAX_HEIGHT>>8),(uint8_t)LCD_MAX_HEIGHT};
@@ -63,7 +64,20 @@ int main(void) {
   //k_msleep(1000);
   //ram_draw_image(0,50,img2);
   // draw_char(0,0,'B',FONT_LARGE,BLACK,BLUE);
-  draw_text(0,0,"100.567",FONT_LARGE,MAGENTA,BLUE);
+  //draw_text(0,0,"100.567",FONT_LARGE,MAGENTA,BLUE);
+  j_component* TEXT = create_component("text1",J_TEXT,0,0,NULL);
+  j_component* BUTTON = create_component("button1",J_BUTTON,0,0,NULL);
+  j_component* IMG = create_component("image1",J_IMAGE,0,0,NULL);
+  j_component* IMG1 = create_component("image2",J_IMAGE,0,0,NULL);
+  j_component* BUTTON1 = create_component("button2",J_BUTTON,69,69,NULL);
+  add_component(BUTTON);
+  add_component(IMG);
+  add_component(IMG1);
+  add_component(TEXT);
+  add_component(BUTTON1);
+  print_components();
+  change_component_index(TEXT,5);
+  print_components();
 
 
   while(0) {

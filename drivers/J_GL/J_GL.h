@@ -90,6 +90,24 @@ struct J_CONTAINER {
 };
 
 typedef enum {
+  J_BUTTON = 0,
+  J_SHAPE,
+  J_TEXT,
+  J_IMAGE,
+  J_BAR,
+  J_FILL
+} j_type;
+
+
+typedef struct {
+  char* name;
+  j_type type;
+  uint16_t x, y;
+  void* dat;
+  uint8_t index;
+} j_component;
+
+typedef enum {
   BLACK = 0x00000000,
   WHITE = 0x00FFFFFF,
   RED = 0x00FF0000,
@@ -164,9 +182,25 @@ void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
  */
 void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data);
 
-//tbd
-int draw_char(uint16_t x, uint16_t y, char ch, uint8_t font_size, j_color FILL_COL, j_color BG_COL);
+/**
+ * @brief Draw text on the screen at given x and y coords, will wrap around if it leaves screen.
+ * 
+ * @param x X position
+ * @param y Y position
+ * @param font_size a j_font_size compatible font size.
+ * @param FILL_COL color of text
+ * @param BG_COL color to fill the empty space with
+ */
 int draw_text(uint16_t x, uint16_t y, char* str, uint8_t font_size, j_color FILL_COL, j_color BG_COL);
+
+j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat);
+void add_component(j_component* component);
+void remove_component(j_component* component);
+void change_component_index(j_component* component, uint8_t new_index);
+void print_components();
+
+void draw_screen();
+
 
 
 #endif

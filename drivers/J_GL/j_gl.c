@@ -10,10 +10,32 @@ static struct spi_buf_set color_data_set = {.buffers = &color_data_buf, .count =
 static uint8_t pixel_color_shape[3] = {0xFF,0x00,0x00};
 static uint16_t bound_buff[4] = {0,0,0,0};
 
-static uint32_t global_color = BLACK;
-
+static j_component* comp_arr[100] = {};
+static uint8_t h_index = 0;
 
 static j_spi_ctx J_CTX1 = {color_data_2,color_data,0x00};
+
+void draw_handle_button(j_component* comp);
+void draw_handle_shape(j_component* comp);
+void draw_handle_text(j_component* comp);
+void draw_handle_image(j_component* comp);
+void draw_handle_bar(j_component* comp);
+
+// dat is a j_color pointer
+void draw_handle_fill(j_component* comp) {
+  set_bounds((uint16_t[]){0,LCD_MAX_HEIGHT,0,LCD_MAX_LENGTH});
+  cmd_bounds();
+  draw_color_fs((j_color)(*comp->dat))
+}
+
+void (*draw_handle_funcs[])(j_component*) = {
+  draw_handle_button,
+  draw_handle_shape,
+  draw_handle_text,
+  draw_handle_image,
+  draw_handle_bar,
+  draw_handle_fill
+};
 
 void J_init(const struct device* dev_spi, const struct device* dev_i2c, const struct spi_config* spi_cfg, const struct gpio_dt_spec* dcx_gpio, uint16_t* bounds) {
   J_CONTAINER_t.dev_spi = dev_spi;
@@ -357,3 +379,83 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data) {
   printk("RAMLOAD: Image written\n");
 }
 
+j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat) {
+  j_component* ret = malloc(sizeof(j_component));
+  if(ret == NULL) return NULL;
+  ret->name = name;
+  ret->type = type;
+  ret->x = x;
+  ret->y = y;
+  ret->dat = dat;
+  ret->index = 101;
+  return ret;
+}
+
+void add_component(j_component* component) {
+  comp_arr[h_index] = component;
+  component->index = h_index;
+  h_index++;
+}
+
+void remove_component(j_component* component) {
+  uint8_t index = component->index;
+  if(index > 99)
+    return;
+  printk("\"%s\" removed from index [%d]...\n\n",component->name,index);
+  component->index = 101;
+  if(index == 99 || comp_arr[index+1] == NULL) {
+    comp_arr[index] = NULL;
+    return;
+  }
+  while(index < 99) {
+    comp_arr[index] = comp_arr[index+1];
+    if(comp_arr[index] == NULL)
+      break;
+    comp_arr[index]->index = index;
+    index++;
+  }
+  h_index--;
+  comp_arr[index] = NULL;
+  free(component);
+}
+
+void change_component_index(j_component* component, uint8_t new_index) {
+  uint8_t index = component->index;
+  if(new_index > 99 || new_index >= h_index || new_index == index) return;
+  int8_t increment = new_index < component->index ? -1 : 1;
+
+  printk("\"%s\" switched from index %d to %d...\n\n", component->name,component->index,new_index);
+
+  while((index * increment) < (new_index * increment)) {
+    comp_arr[index] = comp_arr[index+increment];
+    comp_arr[index]->index = index;
+    index += increment;
+  }
+  component->index = new_index;
+  comp_arr[index] = component;
+}
+
+void print_components() {
+  printk("Printing component array [%d components]...\n",h_index);
+  char* strings[] = {"J_BUTTON","J_SHAPE","J_TEXT","J_IMAGE","J_BAR"};
+  for(int i = 0; i < 100; i++) {
+    if(comp_arr[i] == NULL)
+      break;
+    j_component* cur = comp_arr[i];
+    printk("[%d] \"%s\"\t[x: %d, y: %d, type: %s]\n", cur->index, cur->name, cur->x, cur->y, strings[cur->type]);
+  }
+  printk("\n");
+}
+
+
+void draw_screen() {
+  set_bounds((uint16_t[]){0,LCD_MAX_HEIGHT,0,LCD_MAX_LENGTH});
+  cmd_bounds();
+  k_msleep(1);
+  draw_color_fs(BLACK);
+  for(int i = 0; i < h_index; i++) {
+    if(comp_arr[i] != NULL && comp_arr[i]->dat != NULL) {
+      draw_handle_funcs[comp_arr[i]->type](comp_arr[i]); // Draw item
+    }
+  }
+}
