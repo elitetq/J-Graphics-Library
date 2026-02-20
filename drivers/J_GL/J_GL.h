@@ -118,13 +118,44 @@ int draw_color_fs(j_color COLOR);
  * @param bounds pointer to an equall sized bounds array
  */
 void set_bounds(uint16_t* user_list);
+
+/**
+ * @brief Receive touch screen response information.
+ * 
+ * @param cmd Touch data commad for response
+ * @param rsp Pointer to store response data
+ */
 void touch_control_cmd_rsp(uint8_t cmd, uint8_t* rsp);
+
+/**
+ * @brief Get position of last touch point.
+ * 
+ * @return 32-bit positional value (first 16 X, last 16 Y)
+ */
 uint32_t get_pos();
 void draw_square(uint16_t x, uint16_t y, uint16_t size);
 int draw_circle(uint16_t x, uint16_t y, uint16_t radius);
+
+/**
+ * @brief Draw image at given x and y positions, img_data should be J_IMG compatible. Assumes first 4 bytes read by img_data are the length and height of image.
+ * 
+ * @param x X position
+ * @param y Y position
+ * @param img_data pointer to image data to be read (J_IMG compatible)
+ */
 void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
-void ram_load(const uint8_t* data, size_t len);
+
+
+/**
+ * @brief Same as draw_image, except faster at the cost of some extra ram usage (around 15kb on a 240x320 display), can be turned off with XX (not yet implemented) command.
+ * 
+ * @param x X position
+ * @param y Y position
+ * @param img_data pointer to image data to be read (J_IMG compatible)
+ */
 void ram_draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
+
+//tbd
 int draw_text(char ch, uint8_t font_size, j_color FILL_COL);
 
 

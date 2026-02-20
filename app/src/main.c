@@ -58,12 +58,17 @@ int main(void) {
   
   J_init(dev,dev_i2c,&spi_cfg,&dcx_gpio,bounds);
   J_LCD_init();
+  draw_color_fs(BLUE);
 
-  //draw_color_fs(YELLOW);
-  draw_image(0,0,img3);
-  k_msleep(1000);
+  //k_msleep(1000);
+  //ram_draw_image(0,50,img2);
+  k_msleep(2000);
+  ram_draw_image(119,0,img1);
+  k_msleep(2000);
+  ram_draw_image(0,0,img1);
 
-  while(1) {
+
+  while(0) {
     uint8_t touch_response;
     uint16_t x_pos, y_pos;
     uint32_t position;
