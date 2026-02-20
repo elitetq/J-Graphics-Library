@@ -61,11 +61,20 @@ typedef enum {
 #define RAM_DATA_SIZE (LCD_MAX_LENGTH+1)*(LCD_MAX_HEIGHT+1)*3/RAM_DATA_DIV
 #define MAX_SPI_CHUNK_SIZE 30000
 
+#define TEXT_KERNING 2
+#define TEXT_SPACING 3
+
 
 // Font sizes
 static uint8_t font_length[3] = {7,11,16};
 static uint8_t font_height[3] = {10,18,26};
 static uint16_t* font_ptr[3] = {Font7x10,Font11x18,Font16x26};
+
+typedef struct {
+  uint8_t* buf_ptr;
+  uint8_t* buf_ptr_2;
+  uint8_t flags; // This is a bitmask (MSB first): Write flag [0], Error flag [1]
+} j_spi_ctx;
 
 typedef enum {
   FONT_SMALL = 0,
@@ -137,7 +146,7 @@ void draw_square(uint16_t x, uint16_t y, uint16_t size);
 int draw_circle(uint16_t x, uint16_t y, uint16_t radius);
 
 /**
- * @brief Draw image at given x and y positions, img_data should be J_IMG compatible. Assumes first 4 bytes read by img_data are the length and height of image.
+ * @brief DEPRECATED: Draw image at given x and y positions, img_data should be J_IMG compatible. Assumes first 4 bytes read by img_data are the length and height of image.
  * 
  * @param x X position
  * @param y Y position
@@ -149,14 +158,15 @@ void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
 /**
  * @brief Same as draw_image, except faster at the cost of some extra ram usage (around 15kb on a 240x320 display), can be turned off with XX (not yet implemented) command.
  * 
- * @param x X position
- * @param y Y position
+ * @param x_coord X position
+ * @param y_coord Y position
  * @param img_data pointer to image data to be read (J_IMG compatible)
  */
-void ram_draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
+void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data);
 
 //tbd
-int draw_text(char ch, uint8_t font_size, j_color FILL_COL);
+int draw_char(uint16_t x, uint16_t y, char ch, uint8_t font_size, j_color FILL_COL, j_color BG_COL);
+int draw_text(uint16_t x, uint16_t y, char* str, uint8_t font_size, j_color FILL_COL, j_color BG_COL);
 
 
 #endif

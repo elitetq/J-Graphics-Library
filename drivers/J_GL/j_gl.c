@@ -1,17 +1,17 @@
 #include "J_GL.h"
 static struct J_CONTAINER J_CONTAINER_t = {0};
+
 static volatile uint8_t color_data_2[RAM_DATA_SIZE];
 static volatile uint8_t color_data[(LCD_MAX_LENGTH+1)*(LCD_MAX_HEIGHT+1)*3/LCD_BUF_DIV];
+static volatile uint8_t font_buf[16*26*3];
+
 static struct spi_buf color_data_buf = {};
 static struct spi_buf_set color_data_set = {.buffers = &color_data_buf, .count = 1};
 static uint8_t pixel_color_shape[3] = {0xFF,0x00,0x00};
 static uint16_t bound_buff[4] = {0,0,0,0};
 
-typedef struct {
-  uint8_t* buf_ptr;
-  uint8_t* buf_ptr_2;
-  uint8_t flags; // This is a bitmask (MSB first): Write flag [0], Error flag [1]
-} j_spi_ctx;
+static uint32_t global_color = BLACK;
+
 
 static j_spi_ctx J_CTX1 = {color_data_2,color_data,0x00};
 
@@ -65,13 +65,13 @@ uint32_t get_pos() {
     touch_control_cmd_rsp(P1_YL,&y_pos_l);
     touch_control_cmd_rsp(P1_XH,&x_pos_h);
     touch_control_cmd_rsp(P1_YH,&y_pos_h);
-    y_pos = (uint16_t)(((x_pos_h & TOUCH_POS_MSB_MASK) << 8) + x_pos_l);
-    x_pos = LCD_MAX_LENGTH - (uint16_t)(((y_pos_h & TOUCH_POS_MSB_MASK) << 8) + y_pos_l);
-    if(x_pos > LCD_MAX_LENGTH) {
-      x_pos = LCD_MAX_LENGTH;
+    x_pos = LCD_MAX_HEIGHT - (uint16_t)(((x_pos_h & TOUCH_POS_MSB_MASK) << 8) + x_pos_l);
+    y_pos = LCD_MAX_LENGTH - (uint16_t)(((y_pos_h & TOUCH_POS_MSB_MASK) << 8) + y_pos_l);
+    if(y_pos > LCD_MAX_LENGTH) {
+      y_pos = LCD_MAX_LENGTH;
     }
-    if(y_pos > LCD_MAX_HEIGHT) {
-      y_pos = LCD_MAX_HEIGHT;
+    if(x_pos > LCD_MAX_HEIGHT) {
+      x_pos = LCD_MAX_HEIGHT;
     }
     printk("%d %d\n", x_pos, y_pos);
     return ((uint32_t)(x_pos) << 16) + (uint32_t)(y_pos);
@@ -142,13 +142,13 @@ void lcd_cmd(uint8_t cmd, struct spi_buf * data) {
   }
 }
 
-// FIX BUG HERE
 void draw_square(uint16_t x, uint16_t y, uint16_t size) {
   bound_buff[2] = y > size ? y - size : 0;
-  bound_buff[3] = (y + size) < LCD_MAX_HEIGHT ? y + size : LCD_MAX_HEIGHT;
+  bound_buff[3] = (y + size) < LCD_MAX_LENGTH ? y + size : LCD_MAX_LENGTH;
   bound_buff[0] = x > size ? x - size : 0;
-  bound_buff[1] = (x + size) < LCD_MAX_LENGTH ? x + size : LCD_MAX_LENGTH;
+  bound_buff[1] = (x + size) < LCD_MAX_HEIGHT ? x + size : LCD_MAX_HEIGHT;
   set_bounds(bound_buff);
+  cmd_bounds();
   draw_color_fs(RED);
 }
 
@@ -187,27 +187,72 @@ void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data) {
   printk("Donezo\n");
 }
 
-int draw_text(char ch, uint8_t font_size, j_color FILL_COL) {
+int draw_char(uint16_t x, uint16_t y, char ch, uint8_t font_size, j_color FILL_COL, j_color BG_COL) {
+  uint8_t x_len = j_fonts_x_len[font_size];
+  uint8_t y_len = j_fonts_y_len[font_size];
+  uint16_t *font_dat = j_fonts[font_size] + (ch - 32)*y_len;
+  int buf_size = y_len*x_len*3;
+  set_bounds((uint16_t[]){x, x + x_len - 1, y, y + y_len - 1});
+  cmd_bounds();
 
+  uint32_t color_array[2] = {BG_COL,FILL_COL};
+
+  lcd_cmd(CMD_MEMORY_WRITE,NULL);
+  gpio_pin_set_dt(J_CONTAINER_t.dcx_gpio,1);
+  int j = 0;
+  uint32_t cur_col = BLACK;
+  for(int i = 0; i < buf_size; i+=3) {
+    cur_col = color_array[!!((font_dat[j / x_len] >> (j % x_len)) & (0x8000 >> (x_len - 1)))];
+    font_buf[i] = cur_col;
+    font_buf[i+1] = cur_col >> 8;
+    font_buf[i+2] = cur_col >> 16;
+    j++;
+  }
+  color_data_buf.buf = font_buf;
+  color_data_buf.len = buf_size;
+
+  spi_write(J_CONTAINER_t.dev_spi,J_CONTAINER_t.spi_cfg,&color_data_set);
+}
+
+int draw_text(uint16_t x, uint16_t y, char* str, uint8_t font_size, j_color FILL_COL, j_color BG_COL) {
+  uint8_t x_len = j_fonts_x_len[font_size];
+  uint8_t y_len = j_fonts_y_len[font_size];
+  uint16_t x_l, y_l;
+  x_l = x;
+  y_l = y;
+  
+  size_t len = 0;
+  while(str[len]) {
+    len++;
+  }
+  for(int i = 0; i < len; i++) {
+    draw_char(x_l,y_l,str[i],font_size,FILL_COL,BG_COL);
+    x_l += x_len + TEXT_KERNING;
+    if(x_l + x_len > LCD_MAX_HEIGHT) {
+      x_l = x;
+      y_l += y_len + TEXT_SPACING;
+    }
+  }
 }
 
 int ram_load(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_crop) {
-  // ram_crop has the following data: [OG_X, OG_Y, CROP_X, CROP_Y]
+  // ram_crop has the following data: [OG_X, OG_Y, CROP_X, CROP_Y, LR]
   if(ram_crop[0] == NULL) {
     for(size_t i = 0; i < len; i++) { 
       ram_data[i] = data[i];
     }
     return len;
   } else { // Crop algorithm
-    uint16_t OG_X, OG_Y, CROP_X, CROP_Y;
+    uint16_t OG_X, OG_Y, CROP_X, CROP_Y, LR;
     OG_X = ram_crop[0];
     OG_Y = ram_crop[1];
     CROP_X = ram_crop[2];
     CROP_Y = ram_crop[3];
+    LR = ram_crop[4];
     size_t i = 0;
     size_t delta = 0;
     for(; i < len; i++) {
-      ram_data[i] = data[i + ((i/(CROP_X * 3))+1)*(OG_X-CROP_X)*3];
+      ram_data[i] = data[i + ((i/(CROP_X * 3))+LR)*(OG_X-CROP_X)*3];
     }
     return len + ((len/(CROP_X*3)))*(OG_X-CROP_X)*3;
   }
@@ -223,19 +268,31 @@ void ram_draw_cb(const struct device *dev, int result, void *data) {
   //printk("Write flag is set to 1\n");
 }
 
-void ram_draw_image(uint16_t x, uint16_t y, const uint8_t* img_data) {  
+void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data) {  
   uint16_t height = (img_data[0] << 8) | img_data[1];
   uint16_t length = (img_data[2] << 8) | img_data[3];
 
+  
+  uint16_t x, y;
+  if(x_coord > 0)
+    x = x_coord;
+  else
+    x = 0;
 
-  img_data = img_data + 4; // Image data actually starts here
+  if(y_coord > 0)
+    y = y_coord;
+  else
+    y = 0;
 
-  uint16_t upper_height = x + length - 1 < LCD_MAX_HEIGHT ? x + length - 1 : LCD_MAX_HEIGHT;
-  uint16_t upper_length = y + height - 1 < LCD_MAX_LENGTH ? x + height - 1 : LCD_MAX_LENGTH;
+  uint16_t LR = x > 0 ? 1 : 0; // Left/Right crop (1 for Right, 0 for Left)
+  uint16_t upper_height = x_coord + length - 1 < LCD_MAX_HEIGHT ? x_coord + length - 1 : LCD_MAX_HEIGHT;
+  uint16_t upper_length = y_coord + height - 1 < LCD_MAX_LENGTH ? y_coord + height - 1 : LCD_MAX_LENGTH;
 
-  uint16_t ram_cmd[4] = {length, height, upper_height - x + 1, upper_length - y + 1};
+  uint16_t ram_cmd[5] = {length, height, upper_height - x + 1, upper_length - y + 1, LR};
   size_t ram_cmd_ret;
   size_t chunk_size;
+
+  img_data = img_data + 4 + (y_coord < 0 ? length * -3 * y_coord : 0); // Image data actually starts here
 
   if(ram_cmd[2] == ram_cmd[0] && ram_cmd[3] == ram_cmd[1]) {
     ram_cmd[0] = NULL; // No cropping needed, simplify spi write.

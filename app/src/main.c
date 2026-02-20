@@ -62,10 +62,8 @@ int main(void) {
 
   //k_msleep(1000);
   //ram_draw_image(0,50,img2);
-  k_msleep(2000);
-  ram_draw_image(119,0,img1);
-  k_msleep(2000);
-  ram_draw_image(0,0,img1);
+  // draw_char(0,0,'B',FONT_LARGE,BLACK,BLUE);
+  draw_text(0,0,"100.567",FONT_LARGE,MAGENTA,BLUE);
 
 
   while(0) {
