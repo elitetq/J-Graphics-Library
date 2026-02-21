@@ -61,7 +61,7 @@ typedef enum {
 #define RAM_DATA_SIZE (LCD_MAX_LENGTH+1)*(LCD_MAX_HEIGHT+1)*3/RAM_DATA_DIV
 #define MAX_SPI_CHUNK_SIZE 30000
 
-#define TEXT_KERNING 2
+#define TEXT_KERNING 0
 #define TEXT_SPACING 3
 
 
@@ -75,6 +75,17 @@ typedef struct {
   uint8_t* buf_ptr_2;
   uint8_t flags; // This is a bitmask (MSB first): Write flag [0], Error flag [1]
 } j_spi_ctx;
+
+typedef enum {
+  BLACK = 0x00000000,
+  WHITE = 0x00FFFFFF,
+  RED = 0x00FF0000,
+  GREEN = 0x0000FF00,
+  BLUE = 0x000000FF,
+  MAGENTA = 0x00FF00FF,
+  YELLOW = 0x00FFFF00,
+  GRAY = 0x007F7F7F
+} j_color;
 
 typedef enum {
   FONT_SMALL = 0,
@@ -103,19 +114,24 @@ typedef struct {
   char* name;
   j_type type;
   uint16_t x, y;
-  void* dat;
+  void* dat; // Often used for direct data, such as text contents or image data.
+  void* dat2; // Often used for cosmetic data, such as colors, size, etc...
   uint8_t index;
 } j_component;
 
-typedef enum {
-  BLACK = 0x00000000,
-  WHITE = 0x00FFFFFF,
-  RED = 0x00FF0000,
-  GREEN = 0x0000FF00,
-  BLUE = 0x000000FF,
-  MAGENTA = 0x00FF00FF,
-  YELLOW = 0x00FFFF00
-} j_color;
+typedef struct {
+  j_color col, bg_col;
+  j_font_size font_size;
+} j_text_data;
+
+typedef struct {
+  j_color col, bg_col, border_col;
+  j_font_size font_size;
+  uint8_t border_width;
+  uint16_t length, height;
+} j_button_data;
+
+
 
 
 /**
@@ -193,13 +209,26 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data);
  */
 int draw_text(uint16_t x, uint16_t y, char* str, uint8_t font_size, j_color FILL_COL, j_color BG_COL);
 
-j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat);
+j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat, void* dat2);
 void add_component(j_component* component);
 void remove_component(j_component* component);
 void change_component_index(j_component* component, uint8_t new_index);
 void print_components();
 
-void draw_screen();
+/**
+ * @brief Draw the current component queue onto the screen. Higher indices are prioritized on the foreground.
+ * 
+ * @param exclude_list The j_types to exclude when redrawing, useful when you want to not redraw certain components to save refresh time.
+ * @param len Length of exclude list (set to 0 or less if no excludes).
+ */
+void draw_screen(int8_t* exclude_list, size_t len);
+
+/**
+ * @brief Draw singular component on screen.
+ * 
+ * @param component Component to draw.
+ */
+void draw_component(j_component* component);
 
 
 

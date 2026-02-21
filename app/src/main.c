@@ -59,26 +59,41 @@ int main(void) {
   
   J_init(dev,dev_i2c,&spi_cfg,&dcx_gpio,bounds);
   J_LCD_init();
-  draw_color_fs(BLUE);
+  draw_color_fs(BLACK);
 
   //k_msleep(1000);
   //ram_draw_image(0,50,img2);
   // draw_char(0,0,'B',FONT_LARGE,BLACK,BLUE);
   //draw_text(0,0,"100.567",FONT_LARGE,MAGENTA,BLUE);
-  j_component* TEXT = create_component("text1",J_TEXT,0,0,NULL);
-  j_component* BUTTON = create_component("button1",J_BUTTON,0,0,NULL);
-  j_component* IMG = create_component("image1",J_IMAGE,0,0,NULL);
-  j_component* IMG1 = create_component("image2",J_IMAGE,0,0,NULL);
-  j_component* BUTTON1 = create_component("button2",J_BUTTON,69,69,NULL);
-  add_component(BUTTON);
-  add_component(IMG);
-  add_component(IMG1);
-  add_component(TEXT);
-  add_component(BUTTON1);
-  print_components();
-  change_component_index(TEXT,5);
-  print_components();
+  j_color black_col = BLACK;
 
+  j_text_data dat_text = {
+    .font_size = FONT_LARGE,
+    .col = MAGENTA,
+    .bg_col = BLACK
+  };
+
+  j_button_data but_profile = {
+    .bg_col = WHITE,
+    .border_col = GRAY,
+    .border_width = 2,
+    .col = BLACK,
+    .font_size = FONT_SMALL,
+    .height = 25,
+    .length = 130
+  };
+
+  j_component* TEXT = create_component("text1",J_TEXT,0,0,"Hello!",&dat_text);
+  j_component* TEXT2 = create_component("text2",J_TEXT,0,40,"This is my code!",&dat_text);
+  j_component* BUTTON = create_component("button1",J_BUTTON,30,40,"Press Here!",&but_profile);
+  j_component* IMG = create_component("image1",J_IMAGE,0,0,img1,NULL);
+  j_component* IMG1 = create_component("image2",J_IMAGE,0,0,NULL,NULL);
+  j_component* BUTTON1 = create_component("button2",J_BUTTON,69,69,NULL,NULL);
+  j_component* FILL = create_component("bg_col",J_FILL,0,0,&black_col,NULL);
+
+  add_component(BUTTON);
+
+  draw_screen(NULL,0);
 
   while(0) {
     uint8_t touch_response;
