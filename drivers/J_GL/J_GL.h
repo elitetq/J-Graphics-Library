@@ -13,7 +13,9 @@
 #include <J_ASSETS.h>
 #include <stdlib.h>
 
-// Touch Sensor Registry Address Defines
+/*----------------------------------------------------------
+          Touch Sensor Registry/Variable Defines
+----------------------------------------------------------*/
 #define TD_ADDR 0x38
 #define P1_XL 0x04 // 1st Touch X pos
 #define P1_XH 0x03 // Event flag
@@ -36,7 +38,9 @@ typedef enum {
 } touch_event_t;
 // -----------------------
 
-// LCD Screen Registry Address Defines
+/*----------------------------------------------------------
+          LCD Screen Registry/Variable Defines
+----------------------------------------------------------*/
 #define CMD_SOFTWARE_RESET 0x01
 #define CMD_SLEEP_OUT 0x11
 #define CMD_DISPLAY_ON 0x29
@@ -65,7 +69,9 @@ typedef enum {
 #define TEXT_SPACING 3
 
 
-// Font sizes
+/*----------------------------------------------------------
+                Font Sizes / Context Struct
+----------------------------------------------------------*/
 static uint8_t font_length[3] = {7,11,16};
 static uint8_t font_height[3] = {10,18,26};
 static uint16_t* font_ptr[3] = {Font7x10,Font11x18,Font16x26};
@@ -76,6 +82,9 @@ typedef struct {
   uint8_t flags; // This is a bitmask (MSB first): Write flag [0], Error flag [1]
 } j_spi_ctx;
 
+/*----------------------------------------------------------
+                      Global J Structs
+----------------------------------------------------------*/
 typedef enum {
   BLACK = 0x00000000,
   WHITE = 0x00FFFFFF,
@@ -92,6 +101,13 @@ typedef enum {
   FONT_MEDIUM,
   FONT_LARGE
 } j_font_size;
+
+typedef enum {
+  J_LEFT,
+  J_CENTER,
+  J_RIGHT
+} j_centering;
+
 struct J_CONTAINER {
   const struct device* dev_spi;
   const struct device* dev_i2c;
@@ -109,6 +125,13 @@ typedef enum {
   J_FILL
 } j_type;
 
+typedef enum {
+  J_BAR_LR = 0,
+  J_BAR_RL,
+  J_BAR_UD,
+  J_BAR_DU
+} j_bar_type;
+
 
 typedef struct {
   char* name;
@@ -116,23 +139,35 @@ typedef struct {
   uint16_t x, y;
   void* dat; // Often used for direct data, such as text contents or image data.
   void* dat2; // Often used for cosmetic data, such as colors, size, etc...
-  uint8_t index;
+  uint8_t index, index2;
 } j_component;
 
+/*----------------------------------------------------------
+                  Component Data Structs
+----------------------------------------------------------*/
 typedef struct {
   j_color col, bg_col;
   j_font_size font_size;
+  j_centering centering;
 } j_text_data;
 
 typedef struct {
   j_color col, bg_col, border_col;
   j_font_size font_size;
-  uint8_t border_width;
+  uint8_t border_width, pressed_status; // Pressed_status is not pressed (0) and pressed (1)
   uint16_t length, height;
 } j_button_data;
 
+typedef struct {
+  j_bar_type type;
+  j_color col, bg_col;
+  uint16_t length, height;
+} j_bar_data;
 
 
+/*----------------------------------------------------------
+                    Function Prototypes
+----------------------------------------------------------*/
 
 /**
  * @brief J_GL initialization
@@ -230,6 +265,17 @@ void draw_screen(int8_t* exclude_list, size_t len);
  */
 void draw_component(j_component* component);
 
+j_component* lcd_check_button_pressed(uint16_t x, uint16_t y);
 
+/**
+ * @brief Will refresh the display to make the button look "clicked".
+ * 
+ * @param button Button component to be updated.
+ * 
+ * @return 0 for null button pointer, 1 otherwise
+ */
+uint8_t press_button_visual(j_component* button);
+
+void update_text(j_component* text_component, char* new_str);
 
 #endif

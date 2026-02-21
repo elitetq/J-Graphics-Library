@@ -21,7 +21,7 @@ if __name__ == '__main__':
         quit()
         
         
-    f.write(f'const uint8_t {array_name}[] = ' + '{')
+    f.write(f'static const uint8_t {array_name}[] = ' + '{')
     f.write(f'0x{(rows & hex_mask) >> 8:02X},0x{(rows & ~hex_mask):02X},0x{(columns & hex_mask) >> 8:02X},0x{(columns & ~hex_mask):02X},\n')
     print(img)
     for i, pixel in enumerate(img):

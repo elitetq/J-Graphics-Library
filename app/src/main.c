@@ -68,32 +68,69 @@ int main(void) {
   j_color black_col = BLACK;
 
   j_text_data dat_text = {
-    .font_size = FONT_LARGE,
-    .col = MAGENTA,
-    .bg_col = BLACK
+    .font_size = FONT_SMALL,
+    .col = WHITE,
+    .bg_col = BLACK,
+    .centering = J_CENTER
   };
 
   j_button_data but_profile = {
-    .bg_col = WHITE,
-    .border_col = GRAY,
+    .bg_col = MAGENTA,
+    .border_col = WHITE,
     .border_width = 2,
-    .col = BLACK,
-    .font_size = FONT_SMALL,
-    .height = 25,
-    .length = 130
+    .col = YELLOW,
+    .font_size = FONT_MEDIUM,
+    .height = 35,
+    .length = 100,
+    .pressed_status = 0
   };
 
-  j_component* TEXT = create_component("text1",J_TEXT,0,0,"Hello!",&dat_text);
-  j_component* TEXT2 = create_component("text2",J_TEXT,0,40,"This is my code!",&dat_text);
-  j_component* BUTTON = create_component("button1",J_BUTTON,30,40,"Press Here!",&but_profile);
-  j_component* IMG = create_component("image1",J_IMAGE,0,0,img1,NULL);
-  j_component* IMG1 = create_component("image2",J_IMAGE,0,0,NULL,NULL);
-  j_component* BUTTON1 = create_component("button2",J_BUTTON,69,69,NULL,NULL);
-  j_component* FILL = create_component("bg_col",J_FILL,0,0,&black_col,NULL);
+  j_bar_data bar_dat = {
+    .bg_col = BLACK,
+    .col = WHITE,
+    .height = 2,
+    .length = 100,
+    .type = J_BAR_LR
+  };
 
-  add_component(BUTTON);
+  uint8_t val = 20;
+
+  j_component* TEXT = create_component("text1",J_TEXT,120,270,"",&dat_text);
+  j_component* TEXT2 = create_component("text2",J_TEXT,0,40,"This is my code!",&dat_text);
+  j_component* BUTTON = create_component("button1",J_BUTTON,120-but_profile.length/2,20,"Press!",&but_profile);
+  j_component* BUTTON1 = create_component("button2",J_BUTTON,120-but_profile.length/2,60,"Hola",&but_profile);
+  j_component* BUTTON2 = create_component("button3",J_BUTTON,120-but_profile.length/2,100,"uhh",&but_profile);
+  j_component* BUTTON3 = create_component("button4",J_BUTTON,120-but_profile.length/2,140,"waow",&but_profile);
+  j_component* IMG = create_component("image1",J_IMAGE,120-50,110,sojourn_logo_img,NULL);
+  j_component* IMG1 = create_component("image2",J_IMAGE,0,0,img1,NULL);
+  j_component* FILL = create_component("bg_col",J_FILL,0,0,&black_col,NULL);
+  j_component* BAR = create_component("bar1",J_BAR,120-bar_dat.length/2,285,&val,&bar_dat);
+
+  char* str_array[4] = {"Loading components...","Loading images...","Doing cool stuff...","Flipping pancakes..."};
+  int j = -1;
+
+  add_component(FILL);
+  add_component(IMG);
+  add_component(BAR);
+  add_component(TEXT);
+  // add_component(BUTTON);
+  // add_component(BUTTON1);
+  // add_component(BUTTON2);
+  // add_component(BUTTON3);
 
   draw_screen(NULL,0);
+
+
+  while(1) {
+    val+= 5;
+    if(!(val %= 105)) {
+      j++;
+      j %= 4;
+      update_text(TEXT,str_array[j]);
+    }
+    draw_component(BAR);
+    k_msleep(50);
+  }
 
   while(0) {
     uint8_t touch_response;
@@ -104,7 +141,13 @@ int main(void) {
       position = get_pos();
       x_pos = (uint16_t)(position >> 16);
       y_pos = (uint16_t)(position);
-      draw_square(x_pos,y_pos,8);
+      j_component* button = lcd_check_button_pressed(x_pos,y_pos);
+      if(press_button_visual(button)) {
+        remove_component(BUTTON1);
+        remove_component(BUTTON2);
+        draw_screen(NULL,0);
+        k_msleep(50);
+      }
     }
   }
   return 0;

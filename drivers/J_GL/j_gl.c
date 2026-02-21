@@ -24,13 +24,15 @@ static uint16_t bound_buff[4] = {0,0,0,0};
 ----------------------------------------------------------*/
 static j_component* comp_arr[100] = {}; // Houses the components for the component queue
 static uint8_t h_index = 0; // Keeps track of highest index in component array
+static j_component* button_arr[25] = {};
+static uint8_t h_index_b = 0;
 static j_spi_ctx J_CTX1 = {color_data_2,color_data,0x00}; // Used in ram_draw function
 
 /*----------------------------------------------------------
                         Draw Handlers
 ----------------------------------------------------------*/
 void draw_handle_button(j_component* comp) {
-  j_button_data button_default = {.border_width = 1, .bg_col = WHITE, .border_col = GRAY, .col = BLACK, .height = 30, .length = 80, .font_size = FONT_MEDIUM};
+  j_button_data button_default = {.border_width = 1, .bg_col = WHITE, .border_col = GRAY, .col = BLACK, .height = 30, .length = 80, .font_size = FONT_MEDIUM, .pressed_status = 0};
   j_button_data* button_dat = comp->dat2 == NULL ? &button_default : (j_button_data*)comp->dat2;
   char* str = (char*)comp->dat;
   uint8_t len = 0;
@@ -59,15 +61,15 @@ void draw_handle_button(j_component* comp) {
     comp->y+y_len-button_dat->border_width
   });
   cmd_bounds();
-  draw_color_fs(button_dat->bg_col);
+  draw_color_fs(button_dat->pressed_status ? button_dat->col : button_dat->bg_col);
 
   draw_text(
     comp->x+((x_len)/2)-((len*(j_fonts_x_len[button_dat->font_size]+TEXT_KERNING))/2),
     comp->y+((y_len*11)/20)-j_fonts_y_len[button_dat->font_size]/2,
     str,
     button_dat->font_size,
-    button_dat->col,
-    button_dat->bg_col
+    button_dat->pressed_status ? button_dat->bg_col : button_dat->col,
+    button_dat->pressed_status ? button_dat->col : button_dat->bg_col
   );
 }
 
@@ -77,17 +79,66 @@ void draw_handle_shape(j_component* comp) {
 
 void draw_handle_text(j_component* comp) {
   char* text_str = (char*)(comp->dat);
-  j_text_data text_default = {.font_size = FONT_MEDIUM, .col = BLACK, .bg_col = WHITE};
+  uint16_t len = 0;
+  while(text_str[len]) len++;
+  j_text_data text_default = {.font_size = FONT_MEDIUM, .col = BLACK, .bg_col = WHITE, .centering = J_LEFT};
   j_text_data* text_dat = comp->dat2 == NULL ? &text_default : (j_text_data*)comp->dat2;
-  draw_text(comp->x,comp->y,text_str,text_dat->font_size,text_dat->col,text_dat->bg_col);
+  uint16_t x_l = comp->x;
+  if(text_dat->centering > J_LEFT) {
+    uint16_t shift =  (len*j_fonts_x_len[text_dat->font_size])/(text_dat->centering - 1 ? 1 : 2);
+    x_l -= shift > x_l ? x_l : shift;
+  }
+  draw_text(x_l,comp->y,text_str,text_dat->font_size,text_dat->col,text_dat->bg_col);
 }
 
 void draw_handle_image(j_component* comp) {
   ram_draw_image(comp->x, comp->y, (uint8_t*)comp->dat);
 }
 
+// dat is a uint8_t value from 0 to 100
+// dat2 is a j_bar_data value
 void draw_handle_bar(j_component* comp) {
-  return;
+  uint8_t* val = (uint8_t*)(comp->dat);
+  j_bar_data default_data = {.bg_col = WHITE, .col = GREEN, .height = 15, .length = 100, .type = J_BAR_LR};
+  j_bar_data* bar_dat = comp->dat2 == NULL ? &default_data : (j_bar_data*)(comp->dat2);
+
+  uint16_t x_len, y_len, len_fill; // Get x and y lengths
+  x_len = comp->x + bar_dat->length > LCD_MAX_HEIGHT ? LCD_MAX_HEIGHT - comp->x : bar_dat->length;
+  y_len = comp->y + bar_dat->height > LCD_MAX_LENGTH ? LCD_MAX_LENGTH - comp->y : bar_dat->height;
+
+
+  set_bounds((uint16_t[]){
+    comp->x,
+    comp->x+x_len,
+    comp->y,
+    comp->y+y_len
+  });
+  cmd_bounds();
+  draw_color_fs(bar_dat->bg_col);
+  if(bar_dat->type <= J_BAR_RL) {
+    len_fill = (x_len * *val)/100;
+    uint16_t delta = x_len - len_fill;
+    if(delta < 0) delta *= -1;
+    set_bounds((uint16_t[]){
+      comp->x + (x_len - len_fill)*bar_dat->type,
+      comp->x + len_fill + (x_len - len_fill)*bar_dat->type,
+      comp->y,
+      comp->y + y_len
+    });
+    cmd_bounds();
+  } else {
+    len_fill = (y_len * *val)/100;
+    uint16_t delta = y_len - len_fill;
+    if(delta < 0) delta *= -1;
+    set_bounds((uint16_t[]){
+      comp->x,
+      comp->x + x_len,
+      comp->y + (y_len - len_fill)*(bar_dat->type - 2),
+      comp->y + len_fill + (y_len - len_fill)*(bar_dat->type - 2)
+    });
+    cmd_bounds();
+  }
+  draw_color_fs(bar_dat->col);
 }
 
 // dat is a j_color pointer
@@ -458,14 +509,22 @@ j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, v
   ret->y = y;
   ret->dat = dat;
   ret->dat2 = dat2;
-  ret->index = 101;
+  ret->index = 100;
+  ret->index2 = 25;
   return ret;
 }
 
 void add_component(j_component* component) {
   comp_arr[h_index] = component;
   component->index = h_index;
+  if(component->type == J_BUTTON && component->dat2 != NULL) add_button_component(component);
   h_index++;
+}
+
+void add_button_component(j_component* component) {
+  button_arr[h_index_b] = component;
+  component->index2 = h_index_b;
+  h_index_b++;
 }
 
 void remove_component(j_component* component) {
@@ -473,7 +532,7 @@ void remove_component(j_component* component) {
   if(index > 99)
     return;
   printk("\"%s\" removed from index [%d]...\n\n",component->name,index);
-  component->index = 101;
+  component->index = 100;
   if(index == 99 || comp_arr[index+1] == NULL) {
     comp_arr[index] = NULL;
     return;
@@ -485,10 +544,30 @@ void remove_component(j_component* component) {
     comp_arr[index]->index = index;
     index++;
   }
+  if(component->type == J_BUTTON) { // Remove button from special array
+    button_arr[component->index2] = NULL;
+    uint8_t index2 = component->index2;
+    component->index2 = 25;
+
+    if(index2 == 24 || button_arr[index2+1] == NULL) {
+      button_arr[index2] = NULL;
+      return;
+    }
+
+    while(index2 < 25) {
+      button_arr[index2] = button_arr[index2+1];
+      if(button_arr[index2] == NULL)
+        break;
+      button_arr[index2]->index2 = index2;
+      index2++;
+    }
+  }
   h_index--;
+  h_index_b--;
   comp_arr[index] = NULL;
   free(component);
 }
+
 
 void change_component_index(j_component* component, uint8_t new_index) {
   uint8_t index = component->index;
@@ -509,11 +588,15 @@ void change_component_index(j_component* component, uint8_t new_index) {
 void print_components() {
   printk("Printing component array [%d components]...\n",h_index);
   char* strings[] = {"J_BUTTON","J_SHAPE","J_TEXT","J_IMAGE","J_BAR","J_FILL"};
-  for(int i = 0; i < 100; i++) {
-    if(comp_arr[i] == NULL)
-      break;
+  for(int i = 0; i < h_index; i++) {
     j_component* cur = comp_arr[i];
     printk("[%d] \"%s\"\t[x: %d, y: %d, type: %s, data: %s]\n", cur->index, cur->name, cur->x, cur->y, strings[cur->type], comp_arr[i]->dat == NULL ? "NULL" : "OK");
+  }
+  printk("\nPrinting button array [%d components]...\n",h_index_b);
+  for(int i = 0; i < h_index_b; i++) {
+    j_component* cur = button_arr[i];
+    j_button_data* data = (j_button_data*)button_arr[i]->dat2;
+    printk("[%d] \"%s\"\t[x: %d, y: %d, pressed?: %s]\n", cur->index2, cur->name, cur->x, cur->y, data->pressed_status ? "YES" : "NO");
   }
   printk("\n");
 }
@@ -538,6 +621,66 @@ void draw_screen(int8_t* exclude_list, size_t len) {
 }
 
 void draw_component(j_component* component) {
-  printk("DRAW_COMPONENT: Drawing component \"%s\"...\n\n",component->name);
+  //printk("DRAW_COMPONENT: Drawing component \"%s\"...\n\n",component->name);
   draw_handle_funcs[component->type](component);
+}
+
+void draw_buttons() {
+  for(int i = 0; i < h_index_b; i++) {
+    draw_component(button_arr[i]);
+  }
+}
+
+
+j_component* lcd_check_button_pressed(uint16_t x, uint16_t y) {
+  j_component* ret = NULL;
+  uint16_t x_l, y_l, x_len, y_len;
+  for(int i = 0; i < h_index_b; i++) {
+    if(button_arr[i]->dat2 == NULL) continue;
+
+    j_button_data* button_dat = (j_button_data*)(button_arr[i]->dat2);
+    x_l = button_arr[i]->x;
+    y_l = button_arr[i]->y;
+    x_len = button_dat->length;
+    y_len = button_dat->height;
+
+    if(x > x_l && x < (x_l + x_len) && y > y_l && y < (y_l + y_len)) {
+      ret = button_arr[i];
+      break;
+    }
+  }
+  return ret;
+}
+
+uint8_t press_button_visual(j_component* button) {
+  if(button != NULL) {
+    j_button_data* button_dat = (j_button_data*)(button->dat2);
+    button_dat->pressed_status = 1;
+    draw_component(button);
+    k_msleep(200);
+    button_dat->pressed_status = 0;
+    draw_component(button);
+    return 1;
+  }
+  return 0;
+}
+
+void update_text(j_component* text_component, char* new_str) {
+  if(text_component->dat2 == NULL) return;
+  j_text_data* text_dat = (j_text_data*)text_component->dat2;
+
+  uint16_t len = 0;
+  char* old_str = (char*)text_component->dat;
+  
+  while(old_str[len]) len++;
+  uint16_t x_l = text_component->x;
+  if(text_dat->centering > J_LEFT) {
+    uint16_t shift =  (len*j_fonts_x_len[text_dat->font_size])/(text_dat->centering - 1 ? 1 : 2);
+    x_l -= shift > x_l ? x_l : shift;
+  }
+  set_bounds((uint16_t[]){x_l,x_l+len*(j_fonts_x_len[text_dat->font_size]+TEXT_KERNING),text_component->y,text_component->y+j_fonts_y_len[text_dat->font_size]});
+  cmd_bounds();
+  draw_color_fs(text_dat->bg_col);
+  text_component->dat = new_str;
+  draw_handle_text(text_component);
 }
