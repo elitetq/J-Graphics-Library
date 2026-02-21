@@ -116,6 +116,7 @@ struct J_CONTAINER {
   uint16_t* bounds;
 };
 
+
 typedef enum {
   J_BUTTON = 0,
   J_SHAPE,
@@ -131,6 +132,11 @@ typedef enum {
   J_BAR_UD,
   J_BAR_DU
 } j_bar_type;
+
+typedef enum {
+  FADE_IN,
+  FADE_OUT
+} j_animation_type;
 
 
 typedef struct {
@@ -163,6 +169,13 @@ typedef struct {
   j_color col, bg_col;
   uint16_t length, height;
 } j_bar_data;
+
+typedef struct {
+  j_animation_type type;
+  j_color bg_col;
+  uint8_t increment_speed;
+  uint8_t percentage;
+} j_animation_data;
 
 
 /*----------------------------------------------------------
@@ -231,7 +244,7 @@ void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
  * @param y_coord Y position
  * @param img_data pointer to image data to be read (J_IMG compatible)
  */
-void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data);
+void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animation_data* anim);
 
 /**
  * @brief Draw text on the screen at given x and y coords, will wrap around if it leaves screen.

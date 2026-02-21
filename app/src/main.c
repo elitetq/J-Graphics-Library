@@ -95,13 +95,14 @@ int main(void) {
 
   uint8_t val = 20;
 
+  j_animation_data anim_data = {.bg_col = BLACK, .increment_speed = 5, .percentage = 0, .type = FADE_IN};
   j_component* TEXT = create_component("text1",J_TEXT,120,270,"",&dat_text);
   j_component* TEXT2 = create_component("text2",J_TEXT,0,40,"This is my code!",&dat_text);
   j_component* BUTTON = create_component("button1",J_BUTTON,120-but_profile.length/2,20,"Press!",&but_profile);
   j_component* BUTTON1 = create_component("button2",J_BUTTON,120-but_profile.length/2,60,"Hola",&but_profile);
   j_component* BUTTON2 = create_component("button3",J_BUTTON,120-but_profile.length/2,100,"uhh",&but_profile);
   j_component* BUTTON3 = create_component("button4",J_BUTTON,120-but_profile.length/2,140,"waow",&but_profile);
-  j_component* IMG = create_component("image1",J_IMAGE,120-50,110,sojourn_logo_img,NULL);
+  j_component* IMG = create_component("image1",J_IMAGE,120-50,110,sojourn_logo_img,&anim_data);
   j_component* IMG1 = create_component("image2",J_IMAGE,0,0,img1,NULL);
   j_component* FILL = create_component("bg_col",J_FILL,0,0,&black_col,NULL);
   j_component* BAR = create_component("bar1",J_BAR,120-bar_dat.length/2,285,&val,&bar_dat);
@@ -117,6 +118,15 @@ int main(void) {
   // add_component(BUTTON1);
   // add_component(BUTTON2);
   // add_component(BUTTON3);
+  while(1) {
+    uint8_t touch_response;
+    uint16_t x_pos, y_pos;
+    uint32_t position;
+    touch_control_cmd_rsp(TD_STATUS,&touch_response);
+    if(touch_response == 1) {
+      break;
+    }
+  }
 
   draw_screen(NULL,0);
 

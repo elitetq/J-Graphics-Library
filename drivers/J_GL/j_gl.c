@@ -92,7 +92,9 @@ void draw_handle_text(j_component* comp) {
 }
 
 void draw_handle_image(j_component* comp) {
-  ram_draw_image(comp->x, comp->y, (uint8_t*)comp->dat);
+  j_animation_data* anim_dat = NULL;
+  if(comp->dat2 != NULL) anim_dat = (j_animation_data*)comp->dat2;
+  ram_draw_image(comp->x, comp->y, (uint8_t*)comp->dat, anim_dat);
 }
 
 // dat is a uint8_t value from 0 to 100
@@ -382,11 +384,23 @@ int draw_text(uint16_t x, uint16_t y, char* str, uint8_t font_size, j_color FILL
   }
 }
 
-int ram_load(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_crop) {
+int ram_load(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_crop, j_animation_data* anim_dat) {
   // ram_crop has the following data: [OG_X, OG_Y, CROP_X, CROP_Y, LR]
   if(ram_crop[0] == NULL) {
-    for(size_t i = 0; i < len; i++) { 
-      ram_data[i] = data[i];
+    if(anim_dat != NULL) {
+      uint8_t bg_col_B, bg_col_G, bg_col_R;
+      bg_col_B = (anim_dat->bg_col >> 16);
+      bg_col_G = ((anim_dat->bg_col & 0x00FF00) >> 8);
+      bg_col_R = anim_dat->bg_col & 0x0000FF;
+      for(size_t i = 0; i < len; i+=3) { 
+        ram_data[i] = bg_col_B + (((int32_t)data[i] - (int32_t)bg_col_B)*anim_dat->percentage)/100;
+        ram_data[i+1] = bg_col_G + (((int32_t)data[i+1] - (int32_t)(bg_col_G))*anim_dat->percentage)/100;
+        ram_data[i+2] = bg_col_R + (((int32_t)data[i+2] - (int32_t)(bg_col_R))*anim_dat->percentage)/100;
+      }
+    } else {
+      for(size_t i = 0; i < len; i++) { 
+        ram_data[i] = data[i];
+      }
     }
     return len;
   } else { // Crop algorithm
@@ -415,7 +429,7 @@ void ram_draw_cb(const struct device *dev, int result, void *data) {
   //printk("Write flag is set to 1\n");
 }
 
-void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data) {  
+void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animation_data* anim) {  
   uint16_t height = (img_data[0] << 8) | img_data[1];
   uint16_t length = (img_data[2] << 8) | img_data[3];
 
@@ -439,7 +453,9 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data) {
   size_t ram_cmd_ret;
   size_t chunk_size;
 
+  const uint8_t* old_img_data = img_data;
   img_data = img_data + 4 + (y_coord < 0 ? length * -3 * y_coord : 0); // Image data actually starts here
+  
 
   if(ram_cmd[2] == ram_cmd[0] && ram_cmd[3] == ram_cmd[1]) {
     ram_cmd[0] = NULL; // No cropping needed, simplify spi write.
@@ -466,14 +482,14 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data) {
   lcd_cmd(CMD_MEMORY_WRITE,NULL);
   
   gpio_pin_set_dt(J_CONTAINER_t.dcx_gpio,1);
-  ram_cmd_ret = ram_load(color_data,img_data,chunk_size,ram_cmd); // Will return the correct location where ram_load left off
+  ram_cmd_ret = ram_load(color_data,img_data,chunk_size,ram_cmd, anim); // Will return the correct location where ram_load left off
   spi_transceive_cb(J_CONTAINER_t.dev_spi,J_CONTAINER_t.spi_cfg,&color_data_set,NULL,ram_draw_cb,NULL);
   while(offset < size) {
     if(offset + chunk_size > size)
       chunk_size = size - offset;
     img_data += ram_cmd_ret;
     offset += chunk_size;
-    ram_load(J_CTX1.buf_ptr,img_data,chunk_size,ram_cmd);
+    ram_load(J_CTX1.buf_ptr,img_data,chunk_size,ram_cmd,anim);
     color_data_buf.buf = J_CTX1.buf_ptr;
     color_data_buf.len = chunk_size;
 
@@ -498,6 +514,16 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data) {
   J_CTX1.buf_ptr_2 = color_data;
   J_CTX1.flags &= 0x00;
   printk("RAMLOAD: Image written\n");
+  if(anim != NULL) {
+    if(anim->percentage == 100) {
+      k_msleep(100);
+      anim->percentage = 0;
+      return;
+    }
+    anim->percentage += anim->increment_speed;
+    if(anim->percentage > 100) anim->percentage = 100;
+    ram_draw_image(x_coord,y_coord,old_img_data,anim);
+  }
 }
 
 j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat, void* dat2) {
