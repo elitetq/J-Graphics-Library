@@ -24,9 +24,124 @@ static uint16_t bound_buff[4] = {0,0,0,0};
 ----------------------------------------------------------*/
 static j_component* comp_arr[100] = {}; // Houses the components for the component queue
 static uint8_t h_index = 0; // Keeps track of highest index in component array
+
+static j_linked_list comp_linked_list = {.start = NULL, .end = NULL};
+
 static j_component* button_arr[25] = {};
 static uint8_t h_index_b = 0;
 static j_spi_ctx J_CTX1 = {color_data_2,color_data,0x00}; // Used in ram_draw function
+
+/*----------------------------------------------------------
+                    Shape Draw Handlers
+----------------------------------------------------------*/
+
+void shape_draw_rectangle(j_component* comp, j_shape_data* shape_dat, j_animation_data* anim_dat) {
+  j_centering CENTERING = shape_dat->centering;
+  uint16_t x, y, x2, y2;
+  x = comp->x - (CENTERING == J_LEFT ? 0 : shape_dat->length / (3-CENTERING));
+  y = comp->y - (CENTERING == J_CENTER ? shape_dat->height/2 : 0);
+  x2 = x+shape_dat->length;
+  y2 = y+shape_dat->height;
+  if(x > LCD_MAX_HEIGHT) return;
+  if(x2 > LCD_MAX_HEIGHT) x2 = LCD_MAX_HEIGHT;
+  if(y2 > LCD_MAX_LENGTH) y2 = LCD_MAX_LENGTH;
+  set_bounds((uint16_t[]){x,x2,y,y2});
+  cmd_bounds();
+
+  if(anim_dat != NULL) { // Animations here
+    uint8_t percentage = anim_dat->percentage;
+    uint8_t increment = anim_dat->increment_speed ? anim_dat->increment_speed : 1;
+    if(anim_dat->type <= FADE_OUT) { // Fade in / Fade out
+      uint8_t bg_col_B, bg_col_G, bg_col_R, col_B, col_G, col_R;
+      j_color draw_col, shape_col, bg_col;
+
+      bg_col = anim_dat->type ? shape_dat->col : shape_dat->bg_col;
+      shape_col = anim_dat->type ? shape_dat->bg_col : shape_dat->col;
+      
+      col_B = shape_col;
+      bg_col_B = bg_col;
+      col_G = shape_col >> 8;
+      bg_col_G = bg_col >> 8;
+      col_R = shape_col >> 16;
+      bg_col_R = bg_col >> 16;
+      while(percentage <= 100) {
+        draw_col = (percentage * col_B + (100 - percentage) * bg_col_B)/100 + 
+                  ((percentage * col_G + (100 - percentage) * bg_col_G)/100 << 8) +
+                  ((percentage * col_R + (100 - percentage) * bg_col_R)/100 << 16);
+        printk("%d\n",draw_col);
+        draw_color_fs(draw_col);
+        k_msleep(101 - increment);
+        percentage += 1;
+      }
+      draw_color_fs(shape_dat->col);
+      k_msleep(200);
+      return;
+    } else { // Enlarge / Shrink
+      draw_color_fs(shape_dat->col);
+      uint16_t x_l, y_l, x2_l, y2_l, prev_x_l, prev_y_l, prev_x2_l, prev_y2_l, temp;
+      prev_x_l = x;
+      prev_y_l = y;
+      prev_x2_l = x2;
+      prev_y2_l = y2;
+      while(1) {
+        x_l = (x*(100-percentage) + anim_dat->x_low*(percentage))/100;
+        y_l = (y*(100-percentage) + anim_dat->y_low*(percentage))/100;
+        x2_l = (x2*(100-percentage) + anim_dat->x_high*(percentage))/100;
+        y2_l = (y2*(100-percentage) + anim_dat->y_high*(percentage))/100;
+
+        set_bounds((uint16_t[]){x_l,prev_x_l,prev_y_l,prev_y2_l}); // Left side
+        cmd_bounds();
+        prev_x_l > x_l ? draw_color_fs(shape_dat->col) : draw_color_fs(shape_dat->bg_col);
+        
+
+        set_bounds((uint16_t[]){prev_x2_l,x2_l,prev_y_l,prev_y2_l}); // Right side
+        cmd_bounds();
+        prev_x2_l < x2_l ? draw_color_fs(shape_dat->col) : draw_color_fs(shape_dat->bg_col);
+
+        set_bounds((uint16_t[]){x_l,x2_l,y_l,prev_y_l}); // Top side
+        cmd_bounds();
+        prev_y_l > y_l ? draw_color_fs(shape_dat->col) : draw_color_fs(shape_dat->bg_col);
+
+        set_bounds((uint16_t[]){x_l,x2_l,prev_y2_l,y2_l}); // Bottom side
+        cmd_bounds();
+        prev_y2_l < y2_l ? draw_color_fs(shape_dat->col) : draw_color_fs(shape_dat->bg_col);
+
+        prev_x_l = x_l;
+        prev_y_l = y_l;
+        prev_x2_l = x2_l;
+        prev_y2_l = y2_l;
+
+        k_msleep(10);
+        percentage += increment;
+        if(percentage > 100) {
+          if(100 % increment == 0) break;
+          increment = 1;
+          percentage = 100;
+        }
+      }
+      k_msleep(10);
+      return;
+    }
+  }
+  
+  draw_color_fs(shape_dat->col);
+}
+
+void shape_draw_circle(j_component* comp, j_shape_data* shape_dat, j_animation_data* anim_dat) {
+  return;
+}
+
+void shape_draw_triangle(j_component* comp, j_shape_data* shape_dat, j_animation_data* anim_dat) {
+  return;
+}
+
+void (*shape_draw_funcs[])(j_component*, j_shape_data*, j_animation_data*) = {
+  shape_draw_rectangle,
+  shape_draw_circle,
+  shape_draw_triangle,
+  shape_draw_triangle,
+  shape_draw_triangle
+};
 
 /*----------------------------------------------------------
                         Draw Handlers
@@ -74,7 +189,9 @@ void draw_handle_button(j_component* comp) {
 }
 
 void draw_handle_shape(j_component* comp) {
-  return;
+  j_shape_data* shape_dat = (j_shape_data*)comp->dat;
+  j_animation_data* anim_dat = (j_animation_data*)comp->dat2;
+  shape_draw_funcs[shape_dat->type](comp,shape_dat,anim_dat);
 }
 
 void draw_handle_text(j_component* comp) {
@@ -94,7 +211,7 @@ void draw_handle_text(j_component* comp) {
 void draw_handle_image(j_component* comp) {
   j_animation_data* anim_dat = NULL;
   if(comp->dat2 != NULL) anim_dat = (j_animation_data*)comp->dat2;
-  ram_draw_image(comp->x, comp->y, (uint8_t*)comp->dat, anim_dat);
+  ram_draw_image_helper(comp->x, comp->y, (uint8_t*)comp->dat, anim_dat);
 }
 
 // dat is a uint8_t value from 0 to 100
@@ -109,18 +226,18 @@ void draw_handle_bar(j_component* comp) {
   y_len = comp->y + bar_dat->height > LCD_MAX_LENGTH ? LCD_MAX_LENGTH - comp->y : bar_dat->height;
 
 
-  set_bounds((uint16_t[]){
-    comp->x,
-    comp->x+x_len,
-    comp->y,
-    comp->y+y_len
-  });
-  cmd_bounds();
-  draw_color_fs(bar_dat->bg_col);
   if(bar_dat->type <= J_BAR_RL) {
     len_fill = (x_len * *val)/100;
     uint16_t delta = x_len - len_fill;
-    if(delta < 0) delta *= -1;
+    set_bounds((uint16_t[]){
+      comp->x + len_fill - len_fill*bar_dat->type,
+      comp->x + x_len - len_fill*bar_dat->type,
+      comp->y,
+      comp->y + y_len
+    });
+    cmd_bounds();
+    draw_color_fs(bar_dat->bg_col);
+
     set_bounds((uint16_t[]){
       comp->x + (x_len - len_fill)*bar_dat->type,
       comp->x + len_fill + (x_len - len_fill)*bar_dat->type,
@@ -131,7 +248,15 @@ void draw_handle_bar(j_component* comp) {
   } else {
     len_fill = (y_len * *val)/100;
     uint16_t delta = y_len - len_fill;
-    if(delta < 0) delta *= -1;
+    set_bounds((uint16_t[]){
+      comp->x,
+      comp->x + x_len,
+      comp->y + len_fill - len_fill*bar_dat->type,
+      comp->y + y_len - len_fill*bar_dat->type
+    });
+    cmd_bounds();
+    draw_color_fs(bar_dat->bg_col);
+
     set_bounds((uint16_t[]){
       comp->x,
       comp->x + x_len,
@@ -140,7 +265,7 @@ void draw_handle_bar(j_component* comp) {
     });
     cmd_bounds();
   }
-  draw_color_fs(bar_dat->col);
+  if(len_fill) draw_color_fs(bar_dat->col);
 }
 
 // dat is a j_color pointer
@@ -159,6 +284,7 @@ void (*draw_handle_funcs[])(j_component*) = {
   draw_handle_bar,
   draw_handle_fill
 };
+
 
 /*----------------------------------------------------------
                     Function Definitions
@@ -248,9 +374,16 @@ int draw_color_fs(j_color COLOR) {
 
 void set_bounds(uint16_t* user_list) {
   // xlo, xhi, ylo, yhi -> ylo, yhi, xlo, xhi
-  if(user_list[0] > user_list[1] || user_list[2] > user_list[3]) {
-    printk("Invalid bounds xlo, xhi, ylo, yhi = %d %d %d %d\n",user_list[0],user_list[1],user_list[2],user_list[3]);
-    return;
+  uint16_t temp;
+  if(user_list[0] > user_list[1]) {
+    temp = user_list[0];
+    user_list[0] = user_list[1];
+    user_list[1] = temp;
+  }
+  if(user_list[2] > user_list[3]) {
+    temp = user_list[2];
+    user_list[2] = user_list[3];
+    user_list[3] = temp;
   }
   uint16_t cnv_list[4];
   cnv_list[3] = user_list[3];
@@ -389,13 +522,14 @@ int ram_load(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_c
   if(ram_crop[0] == NULL) {
     if(anim_dat != NULL) {
       uint8_t bg_col_B, bg_col_G, bg_col_R;
-      bg_col_B = (anim_dat->bg_col >> 16);
-      bg_col_G = ((anim_dat->bg_col & 0x00FF00) >> 8);
-      bg_col_R = anim_dat->bg_col & 0x0000FF;
+      uint8_t *percentage = &(anim_dat->percentage);
+      bg_col_B = anim_dat->bg_col;
+      bg_col_G = (anim_dat->bg_col & 0x00FF00) >> 8;
+      bg_col_R = (anim_dat->bg_col & 0x0000FF) >> 16;
       for(size_t i = 0; i < len; i+=3) { 
-        ram_data[i] = bg_col_B + (((int32_t)data[i] - (int32_t)bg_col_B)*anim_dat->percentage)/100;
-        ram_data[i+1] = bg_col_G + (((int32_t)data[i+1] - (int32_t)(bg_col_G))*anim_dat->percentage)/100;
-        ram_data[i+2] = bg_col_R + (((int32_t)data[i+2] - (int32_t)(bg_col_R))*anim_dat->percentage)/100;
+        ram_data[i] = (*percentage * data[i] + (100 - *percentage) * bg_col_B)/100;
+        ram_data[i+1] = (*percentage * data[i+1] + (100 - *percentage) * bg_col_G)/100;
+        ram_data[i+2] = (*percentage * data[i+2] + (100 - *percentage) * bg_col_R)/100;
       }
     } else {
       for(size_t i = 0; i < len; i++) { 
@@ -514,16 +648,24 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animati
   J_CTX1.buf_ptr_2 = color_data;
   J_CTX1.flags &= 0x00;
   printk("RAMLOAD: Image written\n");
+}
+
+void ram_draw_image_helper(int x_coord, int y_coord, uint8_t* img_dat, j_animation_data* anim) {
   if(anim != NULL) {
-    if(anim->percentage == 100) {
-      k_msleep(100);
-      anim->percentage = 0;
-      return;
+    uint8_t increment = anim->increment_speed ? anim->increment_speed : 1;
+    while(1) {
+      if(anim->percentage == 100) {
+        k_msleep(1000);
+        anim->percentage = 0;
+        break;
+      }
+      anim->percentage += increment;
+      if(anim->percentage > 100) anim->percentage = 100;
+      ram_draw_image(x_coord,y_coord,img_dat,anim);
     }
-    anim->percentage += anim->increment_speed;
-    if(anim->percentage > 100) anim->percentage = 100;
-    ram_draw_image(x_coord,y_coord,old_img_data,anim);
+    return;
   }
+  ram_draw_image(x_coord,y_coord,img_dat,anim);
 }
 
 j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat, void* dat2) {
@@ -537,6 +679,7 @@ j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, v
   ret->dat2 = dat2;
   ret->index = 100;
   ret->index2 = 25;
+  ret->next_ptr = ret->prev_ptr = NULL;
   return ret;
 }
 
@@ -607,6 +750,7 @@ void change_component_index(j_component* component, uint8_t new_index) {
     comp_arr[index]->index = index;
     index += increment;
   }
+
   component->index = new_index;
   comp_arr[index] = component;
 }
@@ -651,11 +795,6 @@ void draw_component(j_component* component) {
   draw_handle_funcs[component->type](component);
 }
 
-void draw_buttons() {
-  for(int i = 0; i < h_index_b; i++) {
-    draw_component(button_arr[i]);
-  }
-}
 
 
 j_component* lcd_check_button_pressed(uint16_t x, uint16_t y) {
@@ -692,7 +831,7 @@ uint8_t press_button_visual(j_component* button) {
 }
 
 void update_text(j_component* text_component, char* new_str) {
-  if(text_component->dat2 == NULL) return;
+  if(text_component->dat2 == NULL || (text_component->prev_ptr == NULL && comp_linked_list.start != text_component)) return;
   j_text_data* text_dat = (j_text_data*)text_component->dat2;
 
   uint16_t len = 0;
@@ -709,4 +848,79 @@ void update_text(j_component* text_component, char* new_str) {
   draw_color_fs(text_dat->bg_col);
   text_component->dat = new_str;
   draw_handle_text(text_component);
+}
+
+
+void add_component_o(j_component* component) {
+  if(comp_linked_list.start == NULL) {
+    comp_linked_list.start = comp_linked_list.end = component;
+    return;
+  }
+  comp_linked_list.end->next_ptr = component;
+  component->prev_ptr = comp_linked_list.end;
+  comp_linked_list.end = component;
+}
+
+uint8_t remove_component_o(j_component* component) {
+  // Check if the next and previous pointer is NULL/non-NULL, and update values accordingly.
+  uint8_t ret = 1;
+  component->next_ptr == NULL ?
+    (comp_linked_list.end == component ? (comp_linked_list.end = component->prev_ptr) : (ret = 0)) :
+    (component->next_ptr->prev_ptr = component->prev_ptr);
+
+  component->prev_ptr == NULL ?
+    (comp_linked_list.start == component ? (comp_linked_list.start = component->next_ptr) : (ret = 0)) :
+    (component->prev_ptr->next_ptr = component->next_ptr);
+  
+  component->prev_ptr = component->next_ptr = NULL;
+
+  return 1;
+}
+
+void insert_component_o(j_component* component, j_component* og_component) {
+  component->prev_ptr = og_component->prev_ptr;
+  component->prev_ptr == NULL ? (comp_linked_list.start = component) : (component->prev_ptr->next_ptr = component);
+  og_component->prev_ptr = component;
+  component->next_ptr = og_component;
+}
+
+void change_component_index_o(j_component* component, uint8_t new_index) {
+  if(!remove_component_o(component)) return;
+  j_component* cur = comp_linked_list.start;
+  if(cur == NULL) return;
+  for(int i = 0; i < MAX_LINKED_LIST_SIZE; i++) { // Safeguard in case of weird loop pointers, infinite loop.
+    if(i == new_index || cur->next_ptr == NULL) {
+      insert_component_o(component,cur);
+      return;
+    }
+    cur = cur->next_ptr;
+  }
+  return;
+}
+
+void print_components_o() {
+  j_component* cur = comp_linked_list.start;
+  printk("Printing components...\n\n");
+  char* strings[] = {"J_BUTTON","J_SHAPE","J_TEXT","J_IMAGE","J_BAR","J_FILL"};
+  int i = 0;
+  for(; i < MAX_LINKED_LIST_SIZE; i++) {
+    if(cur == NULL) break;
+    printk("[%d] \"%s\"\t[x: %d, y: %d, type: %s, data: %s]\n", i, cur->name, cur->x, cur->y, strings[cur->type], comp_arr[i]->dat == NULL ? "NULL" : "OK");
+    cur = cur->next_ptr;
+  }
+  printk("\nFound %d items...\n\n", i);
+}
+
+void draw_screen_o(int8_t* exclude_list, size_t len) {
+  printk("DRAW_SCREEN: Redrawing screen...\n\n");
+  uint8_t exclude_flag = 1;
+  j_component* cur = comp_linked_list.start;
+  for(int i = 0; i < MAX_LINKED_LIST_SIZE; i++) {
+    if(cur == NULL) break;
+    for(int j = 0; j < len; j++) (cur->type == exclude_list[j] ? (exclude_flag = 0) : 0);
+    if(exclude_flag) draw_handle_funcs[cur->type](cur);
+    exclude_flag = 1;
+    cur = cur->next_ptr;
+  }
+  k_msleep(5);
 }

@@ -93,33 +93,38 @@ int main(void) {
     .type = J_BAR_LR
   };
 
-  uint8_t val = 20;
+  j_shape_data shape_dat = {
+    .bg_col = BLACK,
+    .col = WHITE,
+    .centering = J_CENTER,
+    .height = 200,
+    .length = 100,
+    .type = J_RECTANGLE
+  };
+
+  uint8_t val = 0;
 
   j_animation_data anim_data = {.bg_col = BLACK, .increment_speed = 5, .percentage = 0, .type = FADE_IN};
+  j_animation_data anim_data_2 = {.bg_col = BLACK, .increment_speed = 30, .percentage = 0, .type = RESIZE, .x_low = 0, .x_high = 239, .y_low = 0, .y_high = 319};
   j_component* TEXT = create_component("text1",J_TEXT,120,270,"",&dat_text);
-  j_component* TEXT2 = create_component("text2",J_TEXT,0,40,"This is my code!",&dat_text);
   j_component* BUTTON = create_component("button1",J_BUTTON,120-but_profile.length/2,20,"Press!",&but_profile);
-  j_component* BUTTON1 = create_component("button2",J_BUTTON,120-but_profile.length/2,60,"Hola",&but_profile);
-  j_component* BUTTON2 = create_component("button3",J_BUTTON,120-but_profile.length/2,100,"uhh",&but_profile);
-  j_component* BUTTON3 = create_component("button4",J_BUTTON,120-but_profile.length/2,140,"waow",&but_profile);
   j_component* IMG = create_component("image1",J_IMAGE,120-50,110,sojourn_logo_img,&anim_data);
-  j_component* IMG1 = create_component("image2",J_IMAGE,0,0,img1,NULL);
   j_component* FILL = create_component("bg_col",J_FILL,0,0,&black_col,NULL);
+  j_component* SHAPE = create_component("shape1",J_SHAPE,120,160,&shape_dat,&anim_data_2);
+  j_component* SHAPE2 = create_component("shape2",J_SHAPE,240,160,&shape_dat,&anim_data_2);
   j_component* BAR = create_component("bar1",J_BAR,120-bar_dat.length/2,285,&val,&bar_dat);
 
   char* str_array[4] = {"Loading components...","Loading images...","Doing cool stuff...","Flipping pancakes..."};
   int j = -1;
 
-  add_component(FILL);
-  add_component(IMG);
-  add_component(BAR);
-  add_component(TEXT);
-  // add_component(BUTTON);
-  // add_component(BUTTON1);
-  // add_component(BUTTON2);
-  // add_component(BUTTON3);
+  add_component_o(FILL);
+  add_component_o(IMG);
+  add_component_o(BAR);
+  add_component_o(TEXT);
+
+
   while(1) {
-    uint8_t touch_response;
+    uint8_t touch_response = 0;
     uint16_t x_pos, y_pos;
     uint32_t position;
     touch_control_cmd_rsp(TD_STATUS,&touch_response);
@@ -128,19 +133,26 @@ int main(void) {
     }
   }
 
-  draw_screen(NULL,0);
+  draw_screen_o(NULL,0);
 
-
-  while(1) {
+  //draw_screen(NULL,0);
+  while(0) {
     val+= 5;
     if(!(val %= 105)) {
       j++;
-      j %= 4;
+      if(j >= 4) break;
       update_text(TEXT,str_array[j]);
     }
     draw_component(BAR);
     k_msleep(50);
   }
+  k_msleep(50);
+  draw_component(SHAPE);
+  anim_data_2.increment_speed = 10;
+  shape_dat.bg_col = WHITE;
+  shape_dat.col = BLACK;
+  draw_component(SHAPE);
+  // draw_screen(NULL,0);
 
   while(0) {
     uint8_t touch_response;
@@ -153,9 +165,6 @@ int main(void) {
       y_pos = (uint16_t)(position);
       j_component* button = lcd_check_button_pressed(x_pos,y_pos);
       if(press_button_visual(button)) {
-        remove_component(BUTTON1);
-        remove_component(BUTTON2);
-        draw_screen(NULL,0);
         k_msleep(50);
       }
     }

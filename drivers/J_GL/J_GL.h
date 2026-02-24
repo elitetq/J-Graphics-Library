@@ -53,7 +53,9 @@ typedef enum {
 #define LCD_MAX_HEIGHT (uint16_t)0x00EF 
 #define LCD_MAX_LENGTH (uint16_t)0x013F
 #define LCD_BUF_DIV 2
-// -----------------------
+/*----------------------------------------------------------
+                Buffer / Text Safety Defines
+----------------------------------------------------------*/
 #define CNV_8_TO_6(x) ((uint8_t)x << 2u)
 
 #define SLEEP_MS 100
@@ -64,6 +66,7 @@ typedef enum {
 #define RAM_DATA_DIV 4
 #define RAM_DATA_SIZE (LCD_MAX_LENGTH+1)*(LCD_MAX_HEIGHT+1)*3/RAM_DATA_DIV
 #define MAX_SPI_CHUNK_SIZE 30000
+#define MAX_LINKED_LIST_SIZE 1000
 
 #define TEXT_KERNING 0
 #define TEXT_SPACING 3
@@ -96,6 +99,7 @@ typedef enum {
   GRAY = 0x007F7F7F
 } j_color;
 
+
 typedef enum {
   FONT_SMALL = 0,
   FONT_MEDIUM,
@@ -127,6 +131,14 @@ typedef enum {
 } j_type;
 
 typedef enum {
+  J_RECTANGLE,
+  J_CIRCLE,
+  J_ITRIANGLE, // Isoscoles
+  J_RLTRIANGLE, // Right Triangle, Left Biased
+  J_RRTRIANGLE // Right Triangle, Right biased
+} j_shape_type;
+
+typedef enum {
   J_BAR_LR = 0,
   J_BAR_RL,
   J_BAR_UD,
@@ -135,19 +147,28 @@ typedef enum {
 
 typedef enum {
   FADE_IN,
-  FADE_OUT
+  FADE_OUT,
+  RESIZE
 } j_animation_type;
 
+typedef struct j_component j_component;
 
-typedef struct {
+struct j_component {
   char* name;
   j_type type;
   uint16_t x, y;
   void* dat; // Often used for direct data, such as text contents or image data.
   void* dat2; // Often used for cosmetic data, such as colors, size, etc...
   uint8_t index, index2;
-} j_component;
+  j_component* next_ptr;
+  j_component* prev_ptr;
+};
 
+typedef struct {
+  j_component* start;
+  j_component* end;
+} j_linked_list;
+// 
 /*----------------------------------------------------------
                   Component Data Structs
 ----------------------------------------------------------*/
@@ -175,7 +196,15 @@ typedef struct {
   j_color bg_col;
   uint8_t increment_speed;
   uint8_t percentage;
+  uint16_t x_low, y_low, x_high, y_high; // Used for grow / shrink
 } j_animation_data;
+
+typedef struct {
+  j_shape_type type;
+  j_color col, bg_col;
+  j_centering centering;
+  uint16_t length, height;
+} j_shape_data;
 
 
 /*----------------------------------------------------------
@@ -263,6 +292,11 @@ void remove_component(j_component* component);
 void change_component_index(j_component* component, uint8_t new_index);
 void print_components();
 
+void add_component_o(j_component* component);
+uint8_t remove_component_o(j_component* component);
+void change_component_index_o(j_component* component, uint8_t new_index);
+void print_components_o();
+
 /**
  * @brief Draw the current component queue onto the screen. Higher indices are prioritized on the foreground.
  * 
@@ -270,6 +304,7 @@ void print_components();
  * @param len Length of exclude list (set to 0 or less if no excludes).
  */
 void draw_screen(int8_t* exclude_list, size_t len);
+void draw_screen_o(int8_t* exclude_list, size_t len);
 
 /**
  * @brief Draw singular component on screen.
@@ -290,5 +325,6 @@ j_component* lcd_check_button_pressed(uint16_t x, uint16_t y);
 uint8_t press_button_visual(j_component* button);
 
 void update_text(j_component* text_component, char* new_str);
+
 
 #endif
