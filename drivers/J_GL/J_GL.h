@@ -127,7 +127,8 @@ typedef enum {
   J_TEXT,
   J_IMAGE,
   J_BAR,
-  J_FILL
+  J_FILL,
+  J_DECAL
 } j_type;
 
 typedef enum {
@@ -183,6 +184,7 @@ typedef struct {
   j_font_size font_size;
   uint8_t border_width, pressed_status; // Pressed_status is not pressed (0) and pressed (1)
   uint16_t length, height;
+  uint8_t* decal_dat; // set to decal for decal writing, or NULL for text
 } j_button_data;
 
 typedef struct {
@@ -205,6 +207,11 @@ typedef struct {
   j_centering centering;
   uint16_t length, height;
 } j_shape_data;
+
+typedef struct {
+  j_animation_data* animation_dat;
+  j_color col, bg_col;
+} j_decal_data;
 
 
 /*----------------------------------------------------------
@@ -273,7 +280,7 @@ void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data);
  * @param y_coord Y position
  * @param img_data pointer to image data to be read (J_IMG compatible)
  */
-void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animation_data* anim);
+void ram_draw_image(int x_coord, int y_coord, j_component* component, j_animation_data* anim);
 
 /**
  * @brief Draw text on the screen at given x and y coords, will wrap around if it leaves screen.

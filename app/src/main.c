@@ -67,6 +67,7 @@ int main(void) {
   //draw_text(0,0,"100.567",FONT_LARGE,MAGENTA,BLUE);
   j_color black_col = BLACK;
 
+
   j_text_data dat_text = {
     .font_size = FONT_SMALL,
     .col = WHITE,
@@ -102,28 +103,63 @@ int main(void) {
     .type = J_RECTANGLE
   };
 
+  j_button_data button_dat_1 = {
+    .bg_col = WHITE,
+    .border_col = WHITE,
+    .col = BLACK,
+    .border_width = 0,
+    .decal_dat = icon_config_decal,
+    .font_size = FONT_SMALL,
+    .height = 31,
+    .length = 31,
+    .pressed_status = 0
+  };
+
+  j_button_data button_dat_2 = {
+    .bg_col = WHITE,
+    .border_col = WHITE,
+    .col = BLACK,
+    .border_width = 0,
+    .decal_dat = icon_shutdown_decal,
+    .font_size = FONT_SMALL,
+    .height = 31,
+    .length = 31,
+    .pressed_status = 0
+  };
+
+  j_decal_data decal_dat = {
+    .animation_dat = NULL,
+    .bg_col = BLACK,
+    .col = WHITE
+  };
+
+
   uint8_t val = 0;
 
   j_animation_data anim_data = {.bg_col = BLACK, .increment_speed = 5, .percentage = 0, .type = FADE_IN};
   j_animation_data anim_data_2 = {.bg_col = BLACK, .increment_speed = 30, .percentage = 0, .type = RESIZE, .x_low = 0, .x_high = 239, .y_low = 0, .y_high = 319};
-  j_component* TEXT = create_component("text1",J_TEXT,120,270,"",&dat_text);
-  j_component* BUTTON = create_component("button1",J_BUTTON,120-but_profile.length/2,20,"Press!",&but_profile);
-  j_component* IMG = create_component("image1",J_IMAGE,120-50,110,sojourn_logo_img,&anim_data);
   j_component* FILL = create_component("bg_col",J_FILL,0,0,&black_col,NULL);
-  j_component* SHAPE = create_component("shape1",J_SHAPE,120,160,&shape_dat,&anim_data_2);
-  j_component* SHAPE2 = create_component("shape2",J_SHAPE,240,160,&shape_dat,&anim_data_2);
-  j_component* BAR = create_component("bar1",J_BAR,120-bar_dat.length/2,285,&val,&bar_dat);
+  j_component* DECAL = create_component("decal1",J_DECAL,0,0,banner_gui_decal,NULL);
+  j_component* DECAL1 = create_component("decal2",J_DECAL,0,220,planet_gui_decal,NULL);
+  j_component* DECAL2 = create_component("decal3",J_DECAL,30,100,logo_text_gui_decal,&decal_dat);
+  j_component* BUTTON = create_component("button1",J_BUTTON,10,4,"",&button_dat_1);
+  j_component* BUTTON1 = create_component("button2",J_BUTTON,200,4,"",&button_dat_2);
 
   char* str_array[4] = {"Loading components...","Loading images...","Doing cool stuff...","Flipping pancakes..."};
   int j = -1;
 
   add_component_o(FILL);
-  add_component_o(IMG);
-  add_component_o(BAR);
-  add_component_o(TEXT);
+  add_component_o(DECAL);
+  add_component_o(DECAL1);
+  add_component_o(DECAL2);
+  add_component_o(BUTTON);
+  add_component_o(BUTTON1);
+  // add_component_o(IMG);
+  // add_component_o(BAR);
+  // add_component_o(TEXT);
 
 
-  while(1) {
+  while(0) {
     uint8_t touch_response = 0;
     uint16_t x_pos, y_pos;
     uint32_t position;
@@ -134,6 +170,10 @@ int main(void) {
   }
 
   draw_screen_o(NULL,0);
+  printk("hiya\n");
+  k_msleep(1000);
+  press_button_visual(BUTTON);
+
 
   //draw_screen(NULL,0);
   while(0) {
@@ -141,17 +181,15 @@ int main(void) {
     if(!(val %= 105)) {
       j++;
       if(j >= 4) break;
-      update_text(TEXT,str_array[j]);
     }
-    draw_component(BAR);
     k_msleep(50);
   }
-  k_msleep(50);
-  draw_component(SHAPE);
-  anim_data_2.increment_speed = 10;
-  shape_dat.bg_col = WHITE;
-  shape_dat.col = BLACK;
-  draw_component(SHAPE);
+  // k_msleep(50);
+  // draw_component(SHAPE);
+  // anim_data_2.increment_speed = 10;
+  // shape_dat.bg_col = WHITE;
+  // shape_dat.col = BLACK;
+  // draw_component(SHAPE);
   // draw_screen(NULL,0);
 
   while(0) {

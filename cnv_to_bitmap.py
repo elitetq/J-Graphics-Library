@@ -35,11 +35,11 @@ if __name__ == '__main__':
             byte_dat[k%8] = byte_val
 
 
-            if(k%8 == 0 and i != 0):
+            if(k%8 == 7):
                 g += 1
                 g %= 8
                 print(byte_dat)
-                byte_str = "".join(byte_dat)
+                byte_str = F"".join(byte_dat)
                 f.write(f'0x{int(byte_str,2):02X}')
                 byte_dat = ["0"] * 8
                 if(not (i == rows - 1 and j == columns - 1)):
@@ -51,6 +51,9 @@ if __name__ == '__main__':
         for h in range(20):
             string_status += "-" if h / 20 > i / rows else "X"
         print(string_status,end='\n')
+    if(k % 8 != 0):
+        byte_str = "".join(byte_dat)
+        f.write(f',0x{int(byte_str,2):02X}')
     f.write('};')
     
     f.close()

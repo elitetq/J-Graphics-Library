@@ -147,18 +147,20 @@ void (*shape_draw_funcs[])(j_component*, j_shape_data*, j_animation_data*) = {
                         Draw Handlers
 ----------------------------------------------------------*/
 void draw_handle_button(j_component* comp) {
+  printk("wtf\n");
   j_button_data button_default = {.border_width = 1, .bg_col = WHITE, .border_col = GRAY, .col = BLACK, .height = 30, .length = 80, .font_size = FONT_MEDIUM, .pressed_status = 0};
   j_button_data* button_dat = comp->dat2 == NULL ? &button_default : (j_button_data*)comp->dat2;
-  char* str = (char*)comp->dat;
+  j_decal_data* decal_dat = button_dat->decal_dat;
   uint8_t len = 0;
-
+  char* str = (char*)comp->dat;
+  while(str[len]) {
+    len++;
+  }
+  printk("Entered here BUTTON");
   uint16_t x_len, y_len; // Get x and y lengths
   x_len = comp->x + button_dat->length > LCD_MAX_HEIGHT ? LCD_MAX_HEIGHT - comp->x : button_dat->length;
   y_len = comp->y + button_dat->height > LCD_MAX_LENGTH ? LCD_MAX_LENGTH - comp->y : button_dat->height;
 
-  while(str[len]) {
-    len++;
-  }
 
   set_bounds((uint16_t[]){
     comp->x,
@@ -178,14 +180,25 @@ void draw_handle_button(j_component* comp) {
   cmd_bounds();
   draw_color_fs(button_dat->pressed_status ? button_dat->col : button_dat->bg_col);
 
-  draw_text(
-    comp->x+((x_len)/2)-((len*(j_fonts_x_len[button_dat->font_size]+TEXT_KERNING))/2),
-    comp->y+((y_len*11)/20)-j_fonts_y_len[button_dat->font_size]/2,
-    str,
-    button_dat->font_size,
-    button_dat->pressed_status ? button_dat->bg_col : button_dat->col,
-    button_dat->pressed_status ? button_dat->col : button_dat->bg_col
-  );
+  if(decal_dat == NULL) {
+    draw_text(
+      comp->x+((x_len)/2)-((len*(j_fonts_x_len[button_dat->font_size]+TEXT_KERNING))/2),
+      comp->y+((y_len*11)/20)-j_fonts_y_len[button_dat->font_size]/2,
+      str,
+      button_dat->font_size,
+      button_dat->pressed_status ? button_dat->bg_col : button_dat->col,
+      button_dat->pressed_status ? button_dat->col : button_dat->bg_col
+    );
+  } else {
+    j_decal_data decal_specific_dat = {
+      .animation_dat = NULL,
+      .bg_col = button_dat->pressed_status ? button_dat->bg_col : button_dat->col,
+      .col = button_dat->pressed_status ? button_dat->col : button_dat->bg_col};
+    j_component* decal = create_component("",J_DECAL,comp->x + (button_dat->length)/2 - 15,comp->y + (button_dat->height)/2 - 15,decal_dat,&decal_specific_dat);
+    if(decal == NULL) return;
+    draw_handle_image(decal);
+  }
+  printk("ExitedTQ\n");
 }
 
 void draw_handle_shape(j_component* comp) {
@@ -210,8 +223,13 @@ void draw_handle_text(j_component* comp) {
 
 void draw_handle_image(j_component* comp) {
   j_animation_data* anim_dat = NULL;
-  if(comp->dat2 != NULL) anim_dat = (j_animation_data*)comp->dat2;
-  ram_draw_image_helper(comp->x, comp->y, (uint8_t*)comp->dat, anim_dat);
+  if(comp->type == J_IMAGE) {
+    if(comp->dat2 != NULL) anim_dat = (j_animation_data*)comp->dat2;
+  } else {
+    j_decal_data* decal_dat = (j_decal_data*)comp->dat2;
+    if(decal_dat != NULL) anim_dat = decal_dat->animation_dat;
+  }
+  ram_draw_image_helper(comp->x, comp->y, comp, anim_dat);
 }
 
 // dat is a uint8_t value from 0 to 100
@@ -276,13 +294,15 @@ void draw_handle_fill(j_component* comp) {
   draw_color_fs(*COL);
 }
 
+
 void (*draw_handle_funcs[])(j_component*) = {
   draw_handle_button,
   draw_handle_shape,
   draw_handle_text,
   draw_handle_image,
   draw_handle_bar,
-  draw_handle_fill
+  draw_handle_fill,
+  draw_handle_image
 };
 
 
@@ -434,41 +454,6 @@ void draw_square(uint16_t x, uint16_t y, uint16_t size) {
   draw_color_fs(RED);
 }
 
-void draw_image(uint16_t x, uint16_t y, const uint8_t* img_data) {
-  // Obtain position of image
-  uint16_t height = (img_data[0] << 8) | img_data[1];
-  uint16_t length = (img_data[2] << 8) | img_data[3];
-
-  // Set size and chunk_size correspondingly
-  size_t size = length * height * 3;
-  size_t chunk_size = MAX_SPI_CHUNK_SIZE;
-  if(size < MAX_SPI_CHUNK_SIZE)
-    chunk_size = size;
-  img_data = img_data + 4; // Image data actually starts here
-  size_t repeats = size / chunk_size;
-  // Boom boom pretty cool set the bounds
-  set_bounds((uint16_t[]){y, y + length - 1, x, x + height - 1});
-  cmd_bounds();
-  printk("Drawing image with %d chunk size, %d size, (%dx%d)\n",chunk_size,size,length,height);
-  k_msleep(10);
-  color_data_buf.buf = img_data;
-  color_data_buf.len = chunk_size;
-  k_msleep(5);
-  lcd_cmd(CMD_MEMORY_WRITE,NULL);
-  
-  gpio_pin_set_dt(J_CONTAINER_t.dcx_gpio,1);
-  for(int i = 0; i < repeats; i++) {
-    int ret = spi_write(J_CONTAINER_t.dev_spi,J_CONTAINER_t.spi_cfg,&color_data_set);
-    img_data += chunk_size;
-    color_data_buf.buf = img_data;
-    printk("%d %d\n",i,ret);
-  }
-  chunk_size = size - chunk_size*repeats;
-  color_data_buf.len = chunk_size;
-  spi_write(J_CONTAINER_t.dev_spi,J_CONTAINER_t.spi_cfg,&color_data_set);
-  printk("Donezo\n");
-}
-
 int draw_char(uint16_t x, uint16_t y, char ch, uint8_t font_size, j_color FILL_COL, j_color BG_COL) {
   uint8_t x_len = j_fonts_x_len[font_size];
   uint8_t y_len = j_fonts_y_len[font_size];
@@ -517,7 +502,58 @@ int draw_text(uint16_t x, uint16_t y, char* str, uint8_t font_size, j_color FILL
   }
 }
 
-int ram_load(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_crop, j_animation_data* anim_dat) {
+int ram_load_decal(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_crop, j_animation_data* anim_dat, j_component* comp) {
+  // ram_crop has the following data: [OG_X, OG_Y, CROP_X, CROP_Y, LR]
+  size_t pixel_count, k;
+  k = pixel_count = 0;
+  j_decal_data* decal_dat = (j_decal_data*)comp->dat2;
+  j_color col = decal_dat == NULL ? WHITE : decal_dat->col;
+  j_color bg_col = decal_dat == NULL ? BLACK : decal_dat->bg_col;
+  if(ram_crop[0] == NULL) {
+    printk("Hello?\n");
+    if(anim_dat != NULL) {
+      uint8_t bg_col_B, bg_col_G, bg_col_R;
+      uint8_t *percentage = &(anim_dat->percentage);
+      bg_col_B = anim_dat->bg_col;
+      bg_col_G = (anim_dat->bg_col & 0x00FF00) >> 8;
+      bg_col_R = (anim_dat->bg_col & 0x0000FF) >> 16;
+      for(size_t i = 0; i < len; i+=3) { 
+        ram_data[i] = (*percentage * data[i] + (100 - *percentage) * bg_col_B)/100;
+        ram_data[i+1] = (*percentage * data[i+1] + (100 - *percentage) * bg_col_G)/100;
+        ram_data[i+2] = (*percentage * data[i+2] + (100 - *percentage) * bg_col_R)/100;
+      }
+    } else {
+      printk("Entered!");
+      j_color ret_byte = 0x00;
+      size_t i;
+      k = i = pixel_count = 0;
+      for(; i < len; i+=3) { 
+        ret_byte = data[k] & ((0x80) >> pixel_count%8) ? col : bg_col;
+        ram_data[i] = ret_byte;
+        ram_data[i+1] = ret_byte >> 8;
+        ram_data[i+2] = ret_byte >> 16;
+        if(pixel_count%8 == 7) k++;
+        pixel_count++;
+      }
+    }
+    return k;
+  } else { // Crop algorithm
+    uint16_t OG_X, OG_Y, CROP_X, CROP_Y, LR;
+    OG_X = ram_crop[0];
+    OG_Y = ram_crop[1];
+    CROP_X = ram_crop[2];
+    CROP_Y = ram_crop[3];
+    LR = ram_crop[4];
+    size_t i = 0;
+    size_t delta = 0;
+    for(; i < len; i++) {
+      ram_data[i] = data[i + ((i/(CROP_X * 3))+LR)*(OG_X-CROP_X)*3];
+    }
+    return len + ((len/(CROP_X*3)))*(OG_X-CROP_X)*3;
+  }
+}
+
+int ram_load(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_crop, j_animation_data* anim_dat, j_component* comp) {
   // ram_crop has the following data: [OG_X, OG_Y, CROP_X, CROP_Y, LR]
   if(ram_crop[0] == NULL) {
     if(anim_dat != NULL) {
@@ -563,10 +599,12 @@ void ram_draw_cb(const struct device *dev, int result, void *data) {
   //printk("Write flag is set to 1\n");
 }
 
-void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animation_data* anim) {  
+void ram_draw_image(int x_coord, int y_coord, j_component* component, j_animation_data* anim) {  
+  const uint8_t* img_data = (uint8_t*)component->dat;
   uint16_t height = (img_data[0] << 8) | img_data[1];
   uint16_t length = (img_data[2] << 8) | img_data[3];
 
+  int (*ram_draw_func)(uint8_t*, const uint8_t*, size_t, uint16_t*, j_animation_data*, j_component*) = component->type - J_IMAGE ? ram_load_decal : ram_load; // Load decal or image
   
   uint16_t x, y;
   if(x_coord > 0)
@@ -593,7 +631,7 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animati
 
   if(ram_cmd[2] == ram_cmd[0] && ram_cmd[3] == ram_cmd[1]) {
     ram_cmd[0] = NULL; // No cropping needed, simplify spi write.
-    chunk_size = RAM_DATA_SIZE;
+    chunk_size = (RAM_DATA_SIZE/(length*8)) * (length*8);
   } else {
     height = ram_cmd[3];
     length = ram_cmd[2];
@@ -616,14 +654,14 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animati
   lcd_cmd(CMD_MEMORY_WRITE,NULL);
   
   gpio_pin_set_dt(J_CONTAINER_t.dcx_gpio,1);
-  ram_cmd_ret = ram_load(color_data,img_data,chunk_size,ram_cmd, anim); // Will return the correct location where ram_load left off
+  ram_cmd_ret = ram_draw_func(color_data,img_data,chunk_size,ram_cmd,anim,component); // Will return the correct location where ram_load left off
   spi_transceive_cb(J_CONTAINER_t.dev_spi,J_CONTAINER_t.spi_cfg,&color_data_set,NULL,ram_draw_cb,NULL);
   while(offset < size) {
     if(offset + chunk_size > size)
       chunk_size = size - offset;
     img_data += ram_cmd_ret;
     offset += chunk_size;
-    ram_load(J_CTX1.buf_ptr,img_data,chunk_size,ram_cmd,anim);
+    ram_draw_func(J_CTX1.buf_ptr,img_data,chunk_size,ram_cmd,anim,component);
     color_data_buf.buf = J_CTX1.buf_ptr;
     color_data_buf.len = chunk_size;
 
@@ -650,7 +688,7 @@ void ram_draw_image(int x_coord, int y_coord, const uint8_t* img_data, j_animati
   printk("RAMLOAD: Image written\n");
 }
 
-void ram_draw_image_helper(int x_coord, int y_coord, uint8_t* img_dat, j_animation_data* anim) {
+void ram_draw_image_helper(int x_coord, int y_coord, j_component* comp, j_animation_data* anim) {
   if(anim != NULL) {
     uint8_t increment = anim->increment_speed ? anim->increment_speed : 1;
     while(1) {
@@ -661,11 +699,11 @@ void ram_draw_image_helper(int x_coord, int y_coord, uint8_t* img_dat, j_animati
       }
       anim->percentage += increment;
       if(anim->percentage > 100) anim->percentage = 100;
-      ram_draw_image(x_coord,y_coord,img_dat,anim);
+      ram_draw_image(x_coord,y_coord,comp,anim);
     }
     return;
   }
-  ram_draw_image(x_coord,y_coord,img_dat,anim);
+  ram_draw_image(x_coord,y_coord,comp,anim);
 }
 
 j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat, void* dat2) {
@@ -820,13 +858,16 @@ j_component* lcd_check_button_pressed(uint16_t x, uint16_t y) {
 uint8_t press_button_visual(j_component* button) {
   if(button != NULL) {
     j_button_data* button_dat = (j_button_data*)(button->dat2);
+    printk("Entered visual %d\n",button_dat->height);
     button_dat->pressed_status = 1;
     draw_component(button);
     k_msleep(200);
     button_dat->pressed_status = 0;
     draw_component(button);
+    printk("Exited visual\n");
     return 1;
   }
+  printk("invalid\n");
   return 0;
 }
 
