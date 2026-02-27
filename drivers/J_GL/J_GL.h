@@ -58,7 +58,6 @@ typedef enum {
 ----------------------------------------------------------*/
 #define CNV_8_TO_6(x) ((uint8_t)x << 2u)
 
-#define SLEEP_MS 100
 #define PI 3.14159
 #define ARDUINO_SPI_NODE DT_NODELABEL(arduino_spi)
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
@@ -294,10 +293,10 @@ void ram_draw_image(int x_coord, int y_coord, j_component* component, j_animatio
 int draw_text(uint16_t x, uint16_t y, char* str, uint8_t font_size, j_color FILL_COL, j_color BG_COL);
 
 j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat, void* dat2);
-void add_component(j_component* component);
-void remove_component(j_component* component);
-void change_component_index(j_component* component, uint8_t new_index);
-void print_components();
+// void add_component(j_component* component);
+// void remove_component(j_component* component);
+// void change_component_index(j_component* component, uint8_t new_index);
+// void print_components();
 
 void add_component_o(j_component* component);
 uint8_t remove_component_o(j_component* component);
@@ -310,8 +309,9 @@ void print_components_o();
  * @param exclude_list The j_types to exclude when redrawing, useful when you want to not redraw certain components to save refresh time.
  * @param len Length of exclude list (set to 0 or less if no excludes).
  */
-void draw_screen(int8_t* exclude_list, size_t len);
+// void draw_screen(int8_t* exclude_list, size_t len);
 void draw_screen_o(int8_t* exclude_list, size_t len);
+void clear_draw_buffer();
 
 /**
  * @brief Draw singular component on screen.
@@ -320,7 +320,7 @@ void draw_screen_o(int8_t* exclude_list, size_t len);
  */
 void draw_component(j_component* component);
 
-j_component* lcd_check_button_pressed(uint16_t x, uint16_t y);
+j_component* lcd_check_button_pressed(uint16_t x, uint16_t y, uint8_t buffer_amt);
 
 /**
  * @brief Will refresh the display to make the button look "clicked".
@@ -333,5 +333,6 @@ uint8_t press_button_visual(j_component* button);
 
 void update_text(j_component* text_component, char* new_str);
 
+void poll_touch(uint16_t* x, uint16_t* y);
 
 #endif

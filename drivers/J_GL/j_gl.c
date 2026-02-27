@@ -19,16 +19,14 @@ static struct spi_buf color_data_buf = {};
 static struct spi_buf_set color_data_set = {.buffers = &color_data_buf, .count = 1};
 static uint16_t bound_buff[4] = {0,0,0,0};
 
+#define IS_POINT_IN_BOX(x, y, x_l, y_l, x_len, y_len) ((x > x_l) && (y > y_l) && (x < (x_l + x_len)) && (y < (y_l + y_len)))
+#define IS_POINT_IN_BOX_BUFFER(x, y, x_l, y_l, x_len, y_len, buffer) ((x > (x_l-buffer)) && (y > (y_l-buffer)) && (x < (x_l + x_len + buffer)) && (y < (y_l + y_len + buffer)))
+
 /*----------------------------------------------------------
                 Component and Context Structs
 ----------------------------------------------------------*/
-static j_component* comp_arr[100] = {}; // Houses the components for the component queue
-static uint8_t h_index = 0; // Keeps track of highest index in component array
-
 static j_linked_list comp_linked_list = {.start = NULL, .end = NULL};
 
-static j_component* button_arr[25] = {};
-static uint8_t h_index_b = 0;
 static j_spi_ctx J_CTX1 = {color_data_2,color_data,0x00}; // Used in ram_draw function
 
 /*----------------------------------------------------------
@@ -147,7 +145,6 @@ void (*shape_draw_funcs[])(j_component*, j_shape_data*, j_animation_data*) = {
                         Draw Handlers
 ----------------------------------------------------------*/
 void draw_handle_button(j_component* comp) {
-  printk("wtf\n");
   j_button_data button_default = {.border_width = 1, .bg_col = WHITE, .border_col = GRAY, .col = BLACK, .height = 30, .length = 80, .font_size = FONT_MEDIUM, .pressed_status = 0};
   j_button_data* button_dat = comp->dat2 == NULL ? &button_default : (j_button_data*)comp->dat2;
   j_decal_data* decal_dat = button_dat->decal_dat;
@@ -156,7 +153,6 @@ void draw_handle_button(j_component* comp) {
   while(str[len]) {
     len++;
   }
-  printk("Entered here BUTTON");
   uint16_t x_len, y_len; // Get x and y lengths
   x_len = comp->x + button_dat->length > LCD_MAX_HEIGHT ? LCD_MAX_HEIGHT - comp->x : button_dat->length;
   y_len = comp->y + button_dat->height > LCD_MAX_LENGTH ? LCD_MAX_LENGTH - comp->y : button_dat->height;
@@ -195,10 +191,8 @@ void draw_handle_button(j_component* comp) {
       .bg_col = button_dat->pressed_status ? button_dat->bg_col : button_dat->col,
       .col = button_dat->pressed_status ? button_dat->col : button_dat->bg_col};
     j_component* decal = create_component("",J_DECAL,comp->x + (button_dat->length)/2 - 15,comp->y + (button_dat->height)/2 - 15,decal_dat,&decal_specific_dat);
-    if(decal == NULL) return;
-    draw_handle_image(decal);
+    ram_draw_image_helper(decal->x, decal->y, decal, NULL);
   }
-  printk("ExitedTQ\n");
 }
 
 void draw_handle_shape(j_component* comp) {
@@ -278,7 +272,6 @@ void draw_handle_bar(j_component* comp) {
     set_bounds((uint16_t[]){
       comp->x,
       comp->x + x_len,
-      comp->y + (y_len - len_fill)*(bar_dat->type - 2),
       comp->y + len_fill + (y_len - len_fill)*(bar_dat->type - 2)
     });
     cmd_bounds();
@@ -509,22 +502,25 @@ int ram_load_decal(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t*
   j_decal_data* decal_dat = (j_decal_data*)comp->dat2;
   j_color col = decal_dat == NULL ? WHITE : decal_dat->col;
   j_color bg_col = decal_dat == NULL ? BLACK : decal_dat->bg_col;
+  j_color ret_byte = 0x00;
   if(ram_crop[0] == NULL) {
     printk("Hello?\n");
     if(anim_dat != NULL) {
-      uint8_t bg_col_B, bg_col_G, bg_col_R;
       uint8_t *percentage = &(anim_dat->percentage);
-      bg_col_B = anim_dat->bg_col;
-      bg_col_G = (anim_dat->bg_col & 0x00FF00) >> 8;
-      bg_col_R = (anim_dat->bg_col & 0x0000FF) >> 16;
+      j_color bg_col_user = anim_dat->bg_col;
+      j_color bg_col_weighted = (100 - *percentage) * bg_col_user;
+      j_color col_weighted;
       for(size_t i = 0; i < len; i+=3) { 
-        ram_data[i] = (*percentage * data[i] + (100 - *percentage) * bg_col_B)/100;
-        ram_data[i+1] = (*percentage * data[i+1] + (100 - *percentage) * bg_col_G)/100;
-        ram_data[i+2] = (*percentage * data[i+2] + (100 - *percentage) * bg_col_R)/100;
+        ret_byte = data[k] & ((0x80) >> pixel_count%8) ? col : bg_col;
+        col_weighted = *percentage * ret_byte;
+        ram_data[i] = (col_weighted + bg_col_weighted)/100;
+        ram_data[i+1] = (col_weighted + bg_col_weighted)/100;
+        ram_data[i+2] = (col_weighted + bg_col_weighted)/100;
+        if(pixel_count%8 == 7) k++;
+        pixel_count++;
       }
     } else {
       printk("Entered!");
-      j_color ret_byte = 0x00;
       size_t i;
       k = i = pixel_count = 0;
       for(; i < len; i+=3) { 
@@ -537,20 +533,8 @@ int ram_load_decal(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t*
       }
     }
     return k;
-  } else { // Crop algorithm
-    uint16_t OG_X, OG_Y, CROP_X, CROP_Y, LR;
-    OG_X = ram_crop[0];
-    OG_Y = ram_crop[1];
-    CROP_X = ram_crop[2];
-    CROP_Y = ram_crop[3];
-    LR = ram_crop[4];
-    size_t i = 0;
-    size_t delta = 0;
-    for(; i < len; i++) {
-      ram_data[i] = data[i + ((i/(CROP_X * 3))+LR)*(OG_X-CROP_X)*3];
-    }
-    return len + ((len/(CROP_X*3)))*(OG_X-CROP_X)*3;
   }
+  //NOTE: NO crop algorithm for decals.
 }
 
 int ram_load(uint8_t* ram_data, const uint8_t* data, size_t len, uint16_t* ram_crop, j_animation_data* anim_dat, j_component* comp) {
@@ -721,112 +705,112 @@ j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, v
   return ret;
 }
 
-void add_component(j_component* component) {
-  comp_arr[h_index] = component;
-  component->index = h_index;
-  if(component->type == J_BUTTON && component->dat2 != NULL) add_button_component(component);
-  h_index++;
-}
+// void add_component(j_component* component) {
+//   comp_arr[h_index] = component;
+//   component->index = h_index;
+//   if(component->type == J_BUTTON && component->dat2 != NULL) add_button_component(component);
+//   h_index++;
+// }
 
-void add_button_component(j_component* component) {
-  button_arr[h_index_b] = component;
-  component->index2 = h_index_b;
-  h_index_b++;
-}
+// void add_button_component(j_component* component) {
+//   button_arr[h_index_b] = component;
+//   component->index2 = h_index_b;
+//   h_index_b++;
+// }
 
-void remove_component(j_component* component) {
-  uint8_t index = component->index;
-  if(index > 99)
-    return;
-  printk("\"%s\" removed from index [%d]...\n\n",component->name,index);
-  component->index = 100;
-  if(index == 99 || comp_arr[index+1] == NULL) {
-    comp_arr[index] = NULL;
-    return;
-  }
-  while(index < 99) {
-    comp_arr[index] = comp_arr[index+1];
-    if(comp_arr[index] == NULL)
-      break;
-    comp_arr[index]->index = index;
-    index++;
-  }
-  if(component->type == J_BUTTON) { // Remove button from special array
-    button_arr[component->index2] = NULL;
-    uint8_t index2 = component->index2;
-    component->index2 = 25;
+// void remove_component(j_component* component) {
+//   uint8_t index = component->index;
+//   if(index > 99)
+//     return;
+//   printk("\"%s\" removed from index [%d]...\n\n",component->name,index);
+//   component->index = 100;
+//   if(index == 99 || comp_arr[index+1] == NULL) {
+//     comp_arr[index] = NULL;
+//     return;
+//   }
+//   while(index < 99) {
+//     comp_arr[index] = comp_arr[index+1];
+//     if(comp_arr[index] == NULL)
+//       break;
+//     comp_arr[index]->index = index;
+//     index++;
+//   }
+//   if(component->type == J_BUTTON) { // Remove button from special array
+//     button_arr[component->index2] = NULL;
+//     uint8_t index2 = component->index2;
+//     component->index2 = 25;
 
-    if(index2 == 24 || button_arr[index2+1] == NULL) {
-      button_arr[index2] = NULL;
-      return;
-    }
+//     if(index2 == 24 || button_arr[index2+1] == NULL) {
+//       button_arr[index2] = NULL;
+//       return;
+//     }
 
-    while(index2 < 25) {
-      button_arr[index2] = button_arr[index2+1];
-      if(button_arr[index2] == NULL)
-        break;
-      button_arr[index2]->index2 = index2;
-      index2++;
-    }
-  }
-  h_index--;
-  h_index_b--;
-  comp_arr[index] = NULL;
-  free(component);
-}
-
-
-void change_component_index(j_component* component, uint8_t new_index) {
-  uint8_t index = component->index;
-  if(new_index > 99 || new_index >= h_index || new_index == index) return;
-  int8_t increment = new_index < component->index ? -1 : 1;
-
-  printk("\"%s\" switched from index %d to %d...\n\n", component->name,component->index,new_index);
-
-  while((index * increment) < (new_index * increment)) {
-    comp_arr[index] = comp_arr[index+increment];
-    comp_arr[index]->index = index;
-    index += increment;
-  }
-
-  component->index = new_index;
-  comp_arr[index] = component;
-}
-
-void print_components() {
-  printk("Printing component array [%d components]...\n",h_index);
-  char* strings[] = {"J_BUTTON","J_SHAPE","J_TEXT","J_IMAGE","J_BAR","J_FILL"};
-  for(int i = 0; i < h_index; i++) {
-    j_component* cur = comp_arr[i];
-    printk("[%d] \"%s\"\t[x: %d, y: %d, type: %s, data: %s]\n", cur->index, cur->name, cur->x, cur->y, strings[cur->type], comp_arr[i]->dat == NULL ? "NULL" : "OK");
-  }
-  printk("\nPrinting button array [%d components]...\n",h_index_b);
-  for(int i = 0; i < h_index_b; i++) {
-    j_component* cur = button_arr[i];
-    j_button_data* data = (j_button_data*)button_arr[i]->dat2;
-    printk("[%d] \"%s\"\t[x: %d, y: %d, pressed?: %s]\n", cur->index2, cur->name, cur->x, cur->y, data->pressed_status ? "YES" : "NO");
-  }
-  printk("\n");
-}
+//     while(index2 < 25) {
+//       button_arr[index2] = button_arr[index2+1];
+//       if(button_arr[index2] == NULL)
+//         break;
+//       button_arr[index2]->index2 = index2;
+//       index2++;
+//     }
+//   }
+//   h_index--;
+//   h_index_b--;
+//   comp_arr[index] = NULL;
+//   free(component);
+// }
 
 
-void draw_screen(int8_t* exclude_list, size_t len) {
-  printk("DRAW_SCREEN: Redrawing screen with %d components...",h_index);
-  uint8_t exclude_flag = 0;
-  for(int i = 0; i < h_index; i++) {
-    for(int j = 0; j < len; j++) {
-      if(comp_arr[i]->type == exclude_list[j]) {
-        exclude_flag = 1;
-        break;
-      } // Check excludes
-    }
+// void change_component_index(j_component* component, uint8_t new_index) {
+//   uint8_t index = component->index;
+//   if(new_index > 99 || new_index >= h_index || new_index == index) return;
+//   int8_t increment = new_index < component->index ? -1 : 1;
 
-    if(comp_arr[i] != NULL && comp_arr[i]->dat != NULL && !exclude_flag) {
-      draw_handle_funcs[comp_arr[i]->type](comp_arr[i]); // Draw item
-    }
-    exclude_flag = 0;
-  }
-}
+//   printk("\"%s\" switched from index %d to %d...\n\n", component->name,component->index,new_index);
+
+//   while((index * increment) < (new_index * increment)) {
+//     comp_arr[index] = comp_arr[index+increment];
+//     comp_arr[index]->index = index;
+//     index += increment;
+//   }
+
+//   component->index = new_index;
+//   comp_arr[index] = component;
+// }
+
+// void print_components() {
+//   printk("Printing component array [%d components]...\n",h_index);
+//   char* strings[] = {"J_BUTTON","J_SHAPE","J_TEXT","J_IMAGE","J_BAR","J_FILL"};
+//   for(int i = 0; i < h_index; i++) {
+//     j_component* cur = comp_arr[i];
+//     printk("[%d] \"%s\"\t[x: %d, y: %d, type: %s, data: %s]\n", cur->index, cur->name, cur->x, cur->y, strings[cur->type], comp_arr[i]->dat == NULL ? "NULL" : "OK");
+//   }
+//   printk("\nPrinting button array [%d components]...\n",h_index_b);
+//   for(int i = 0; i < h_index_b; i++) {
+//     j_component* cur = button_arr[i];
+//     j_button_data* data = (j_button_data*)button_arr[i]->dat2;
+//     printk("[%d] \"%s\"\t[x: %d, y: %d, pressed?: %s]\n", cur->index2, cur->name, cur->x, cur->y, data->pressed_status ? "YES" : "NO");
+//   }
+//   printk("\n");
+// }
+
+
+// void draw_screen(int8_t* exclude_list, size_t len) {
+//   printk("DRAW_SCREEN: Redrawing screen with %d components...",h_index);
+//   uint8_t exclude_flag = 0;
+//   for(int i = 0; i < h_index; i++) {
+//     for(int j = 0; j < len; j++) {
+//       if(comp_arr[i]->type == exclude_list[j]) {
+//         exclude_flag = 1;
+//         break;
+//       } // Check excludes
+//     }
+
+//     if(comp_arr[i] != NULL && comp_arr[i]->dat != NULL && !exclude_flag) {
+//       draw_handle_funcs[comp_arr[i]->type](comp_arr[i]); // Draw item
+//     }
+//     exclude_flag = 0;
+//   }
+// }
 
 void draw_component(j_component* component) {
   //printk("DRAW_COMPONENT: Drawing component \"%s\"...\n\n",component->name);
@@ -834,25 +818,19 @@ void draw_component(j_component* component) {
 }
 
 
-
-j_component* lcd_check_button_pressed(uint16_t x, uint16_t y) {
-  j_component* ret = NULL;
-  uint16_t x_l, y_l, x_len, y_len;
-  for(int i = 0; i < h_index_b; i++) {
-    if(button_arr[i]->dat2 == NULL) continue;
-
-    j_button_data* button_dat = (j_button_data*)(button_arr[i]->dat2);
-    x_l = button_arr[i]->x;
-    y_l = button_arr[i]->y;
-    x_len = button_dat->length;
-    y_len = button_dat->height;
-
-    if(x > x_l && x < (x_l + x_len) && y > y_l && y < (y_l + y_len)) {
-      ret = button_arr[i];
-      break;
+j_component* lcd_check_button_pressed(uint16_t x, uint16_t y, uint8_t buffer_amt) {
+  j_component* cur = comp_linked_list.start;
+  for(int i = 0; i < MAX_LINKED_LIST_SIZE; i++) {
+    if(cur == NULL) return NULL;
+    if(cur->type == J_BUTTON && cur->dat2 != NULL) {
+      j_button_data* button_dat = (j_button_data*)(cur->dat2);
+      if(IS_POINT_IN_BOX_BUFFER(x,y,cur->x,cur->y,button_dat->length,button_dat->height,buffer_amt)) {
+        return cur;
+      }
     }
+    cur = cur->next_ptr;
   }
-  return ret;
+  return NULL;
 }
 
 uint8_t press_button_visual(j_component* button) {
@@ -946,7 +924,7 @@ void print_components_o() {
   int i = 0;
   for(; i < MAX_LINKED_LIST_SIZE; i++) {
     if(cur == NULL) break;
-    printk("[%d] \"%s\"\t[x: %d, y: %d, type: %s, data: %s]\n", i, cur->name, cur->x, cur->y, strings[cur->type], comp_arr[i]->dat == NULL ? "NULL" : "OK");
+    printk("[%d] \"%s\"\t[x: %d, y: %d, type: %s, data: %s]\n", i, cur->name, cur->x, cur->y, strings[cur->type], cur->dat == NULL ? "NULL" : "OK");
     cur = cur->next_ptr;
   }
   printk("\nFound %d items...\n\n", i);
@@ -964,4 +942,36 @@ void draw_screen_o(int8_t* exclude_list, size_t len) {
     cur = cur->next_ptr;
   }
   k_msleep(5);
+}
+
+void poll_touch(uint16_t* x, uint16_t* y) {
+  uint16_t x_pos, y_pos;
+  x_pos = y_pos = -1;
+  while(1) {
+    uint8_t touch_response;
+    uint32_t position;
+    touch_control_cmd_rsp(TD_STATUS,&touch_response);
+    if(touch_response == 1) {
+      position = get_pos();
+      x_pos = (uint16_t)(position >> 16);
+      y_pos = (uint16_t)(position);
+      break;
+    }
+  }
+  *x = x_pos;
+  *y = y_pos;
+}
+
+void clear_draw_buffer() {
+  j_component* cur = comp_linked_list.start;
+  j_component* next_cur;
+  for(int i = 0; i < MAX_LINKED_LIST_SIZE; i++) {
+    if(cur == NULL) break;
+    next_cur = cur->next_ptr;
+    cur->next_ptr = NULL;
+    cur->prev_ptr = NULL;
+    free(cur);
+    cur = next_cur;
+  }
+  comp_linked_list.start = comp_linked_list.end = NULL;
 }
