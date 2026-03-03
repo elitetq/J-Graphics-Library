@@ -147,7 +147,7 @@ void (*shape_draw_funcs[])(j_component*, j_shape_data*, j_animation_data*) = {
 void draw_handle_button(j_component* comp) {
   j_button_data button_default = {.border_width = 1, .bg_col = WHITE, .border_col = GRAY, .col = BLACK, .height = 30, .length = 80, .font_size = FONT_MEDIUM, .pressed_status = 0};
   j_button_data* button_dat = comp->dat2 == NULL ? &button_default : (j_button_data*)comp->dat2;
-  j_decal_data* decal_dat = button_dat->decal_dat;
+  uint8_t* decal_dat = button_dat->decal_dat;
   uint8_t len = 0;
   char* str = (char*)comp->dat;
   while(str[len]) {
@@ -190,7 +190,10 @@ void draw_handle_button(j_component* comp) {
       .animation_dat = NULL,
       .bg_col = button_dat->pressed_status ? button_dat->bg_col : button_dat->col,
       .col = button_dat->pressed_status ? button_dat->col : button_dat->bg_col};
-    j_component* decal = create_component("",J_DECAL,comp->x + (button_dat->length)/2 - 15,comp->y + (button_dat->height)/2 - 15,decal_dat,&decal_specific_dat);
+
+    uint16_t decal_x_len = (decal_dat[0] << 8) | decal_dat[1];
+    uint16_t decal_y_len = (decal_dat[2] << 8) | decal_dat[3];
+    j_component* decal = create_component("",J_DECAL,comp->x + (button_dat->length)/2 - decal_x_len/2,comp->y + (button_dat->height)/2 - decal_y_len/2,decal_dat,&decal_specific_dat);
     ram_draw_image_helper(decal->x, decal->y, decal, NULL);
   }
 }
@@ -854,12 +857,12 @@ void update_text(j_component* text_component, char* new_str) {
   j_text_data* text_dat = (j_text_data*)text_component->dat2;
 
   uint16_t len = 0;
-  char* old_str = (char*)text_component->dat;
+  char* old_str = (char*)text_component->dat; // Keep this for later
   
   while(old_str[len]) len++;
   uint16_t x_l = text_component->x;
   if(text_dat->centering > J_LEFT) {
-    uint16_t shift =  (len*j_fonts_x_len[text_dat->font_size])/(text_dat->centering - 1 ? 1 : 2);
+    uint16_t shift =  (len*j_fonts_x_len[text_dat->font_size])/(text_dat->centering - 1 ? 1 : 2); // Shift value for X for centering
     x_l -= shift > x_l ? x_l : shift;
   }
   set_bounds((uint16_t[]){x_l,x_l+len*(j_fonts_x_len[text_dat->font_size]+TEXT_KERNING),text_component->y,text_component->y+j_fonts_y_len[text_dat->font_size]});
@@ -868,7 +871,6 @@ void update_text(j_component* text_component, char* new_str) {
   text_component->dat = new_str;
   draw_handle_text(text_component);
 }
-
 
 void add_component_o(j_component* component) {
   if(comp_linked_list.start == NULL) {

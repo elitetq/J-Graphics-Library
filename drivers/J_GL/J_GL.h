@@ -95,7 +95,15 @@ typedef enum {
   BLUE = 0x000000FF,
   MAGENTA = 0x00FF00FF,
   YELLOW = 0x00FFFF00,
-  GRAY = 0x007F7F7F
+  GRAY = 0x007F7F7F,
+  ORANGE = 0x00FF8000,
+  BABY_BLUE = 0x005864FF,
+  PASTEL_BLUE = 0x00CBCEFF,
+  PINK = 0x00FF84FF,
+  SAND = 0x00FFF2D0,
+  TERRACOTTA = 0x00E36A6A,
+  DARK_GRAY = 0x00424242,
+  DIAMOND_BLUE = 0x002B94FC
 } j_color;
 
 
@@ -174,9 +182,10 @@ typedef struct {
 ----------------------------------------------------------*/
 typedef struct {
   j_color col, bg_col;
-  j_font_size font_size;
-  j_centering centering;
+  j_font_size font_size; 
+  j_centering centering; 
 } j_text_data;
+
 
 typedef struct {
   j_color col, bg_col, border_col;
@@ -300,7 +309,19 @@ j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, v
 
 void add_component_o(j_component* component);
 uint8_t remove_component_o(j_component* component);
+
+/**
+ * @brief Change the index of a component in the screen array. Higher is drawn further on the front than lower indices
+ * 
+ * @param component Component you want to modify
+ * @param new_index The new index of the variable
+ */
 void change_component_index_o(j_component* component, uint8_t new_index);
+
+/**
+ * @brief Displays the current components on the screen
+ * 
+ */
 void print_components_o();
 
 /**
@@ -311,6 +332,10 @@ void print_components_o();
  */
 // void draw_screen(int8_t* exclude_list, size_t len);
 void draw_screen_o(int8_t* exclude_list, size_t len);
+
+/**
+ * @brief Clears the screen buffer, along with freeing allocated memory for j_components automatically.
+ */
 void clear_draw_buffer();
 
 /**
@@ -320,6 +345,15 @@ void clear_draw_buffer();
  */
 void draw_component(j_component* component);
 
+/**
+ * @brief Will check which button currently on the screen list is pressed.
+ * 
+ * @param x X coordinate you want to check for
+ * @param y Y coordinate you watn to check for
+ * @param buffer_amt The amount of slack you want to allow from the buttons set bounds, higher means each button has more area to "click"
+ * 
+ * @return j_component struct pointer of the first button that (x,y) are found within the bounds of
+ */
 j_component* lcd_check_button_pressed(uint16_t x, uint16_t y, uint8_t buffer_amt);
 
 /**
@@ -331,8 +365,20 @@ j_component* lcd_check_button_pressed(uint16_t x, uint16_t y, uint8_t buffer_amt
  */
 uint8_t press_button_visual(j_component* button);
 
+/**
+ * @brief Updates text with new string, will automatically rebound the text to new coordinates depending on centering.
+ * 
+ * @param text_component The text j_component struct pointer that you want to modify
+ * @param new_str The new character array you want to replace the text with
+ */
 void update_text(j_component* text_component, char* new_str);
 
+/**
+ * @brief Blocking function. Polls for the first instance of a touch on the screen, and returns x/y coordinates
+ * 
+ * @param x X coordinate return value
+ * @param y Y coordinate return value 
+ */
 void poll_touch(uint16_t* x, uint16_t* y);
 
 #endif
