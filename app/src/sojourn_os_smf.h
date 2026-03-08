@@ -130,8 +130,8 @@ typedef struct {
   uint8_t x_board_offset, y_board_offset;
   j_decal_data bg_decal_dat1, bg_decal_dat2, pellet_decal_dat;
   j_button_data button_decal_dat, button_decal_left_dat, button_decal_right_dat, button_decal_up_dat, button_decal_down_dat;
-  j_component *bg_comp_dat, *snake_shape_comp_dat, *button_comp_left, *button_comp_right, *button_comp_up, *button_comp_down, *pellet_comp_dat;
-  j_shape_data shape_dat;
+  j_component *bg_comp_dat, *snake_shape_comp_dat, *snake_eyes_comp_dat, *button_comp_left, *button_comp_right, *button_comp_up, *button_comp_down, *pellet_comp_dat;
+  j_shape_data shape_dat, shape_dat2;
 } os_snake_game_ctx;
 
 

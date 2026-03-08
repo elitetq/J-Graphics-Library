@@ -27,6 +27,7 @@ static sos_themes global_theme = VOID;
 #define SG_COORDS_TO_INDEX(x_l, y_l) ((((x_l > 0) && (x_l <= 10)) ? x_l - 1 : 0) + ((((y_l > 0) && (y_l <= 10)) ? y_l - 1 : 0))*10)
 #define SG_INDEX_TO_Y_COORD(index) ((index / 10)+1)
 #define SG_INDEX_TO_X_COORD(index) ((index % 10)+1)
+#define SG_CHECK_OUT_OF_BOUNDS(x_l, y_l) ((x_l <= 0) || (x_l > 10) || (y_l <= 0) || (y_l > 10))
 
 // Set these so it is a nice division;
 #define SG_DELAY 50
@@ -58,25 +59,26 @@ static void snake_game_state_entry(void* o) {
 
   page_dat->bg_decal_dat1 = (j_decal_data){.animation_dat = NULL, .bg_col = DARK_GREEN, .col = GREEN};
   page_dat->pellet_decal_dat = (j_decal_data){.animation_dat = NULL, .bg_col = GREEN, .col = GREEN};
-  page_dat->button_decal_left_dat = J_STYLE_BUTTON_SQUARE_MEDIUM(icon_arrow_left_decal,FONT_SMALL);
-  page_dat->button_decal_right_dat = J_STYLE_BUTTON_SQUARE_MEDIUM(icon_arrow_right_decal,FONT_SMALL);
-  page_dat->button_decal_up_dat = J_STYLE_BUTTON_SQUARE_MEDIUM(icon_arrow_up_decal,FONT_SMALL);
-  page_dat->button_decal_down_dat = J_STYLE_BUTTON_SQUARE_MEDIUM(icon_arrow_down_decal,FONT_SMALL);
-  page_dat->button_decal_right_dat.tag = 1;
+  page_dat->button_decal_left_dat = (j_button_data){.bg_col = ctx->global_col, .col = ctx->global_bg_col, .border_col = ctx->global_accent_col, .font_size = FONT_SMALL, .height = 93, .length = 80, .pressed_status = 0, .decal_dat = icon_arrow_left_decal, .border_width = 2, .tag = 0};
+  page_dat->button_decal_right_dat = (j_button_data){.bg_col = ctx->global_col, .col = ctx->global_bg_col, .border_col = ctx->global_accent_col, .font_size = FONT_SMALL, .height = 93, .length = 80, .pressed_status = 0, .decal_dat = icon_arrow_right_decal, .border_width = 2, .tag = 1};
+  page_dat->button_decal_up_dat = (j_button_data){.bg_col = ctx->global_col, .col = ctx->global_bg_col, .border_col = ctx->global_accent_col, .font_size = FONT_SMALL, .height = 44, .length = 65, .pressed_status = 0, .decal_dat = icon_arrow_up_decal, .border_width = 2, .tag = 2};
+  page_dat->button_decal_down_dat = (j_button_data){.bg_col = ctx->global_col, .col = ctx->global_bg_col, .border_col = ctx->global_accent_col, .font_size = FONT_SMALL, .height = 44, .length = 65, .pressed_status = 0, .decal_dat = icon_arrow_down_decal, .border_width = 2, .tag = 3};
   page_dat->button_decal_up_dat.tag = 2;
   page_dat->button_decal_down_dat.tag = 3;
 
-  page_dat->shape_dat = (j_shape_data){.bg_col = J_STYLE_BG_COL, .col = WHITE, .centering = J_LEFT, .height = 19, .length = 19, .type = J_RECTANGLE};
+  page_dat->shape_dat = (j_shape_data){.bg_col = J_STYLE_BG_COL, .col = WHITE, .centering = J_LEFT, .height = 19, .length = 19, .type = J_RECTANGLE}; // Body
+  page_dat->shape_dat2 = (j_shape_data){.bg_col = J_STYLE_BG_COL, .col = BLACK, .centering = J_LEFT, .height = 2, .length = 2, .type = J_RECTANGLE}; // Eyes
 
 
   page_dat->x_board_offset = page_dat->y_board_offset = 20;
   page_dat->snake_shape_comp_dat = create_component("snake_shape",J_SHAPE,0,0,&page_dat->shape_dat,NULL);
+  page_dat->snake_eyes_comp_dat = create_component("snake_eyes",J_SHAPE,0,0,&page_dat->shape_dat2,NULL);
   j_component* bg_fill = create_component("bg_col",J_FILL,0,0,&J_STYLE_BG_COL,NULL);
   page_dat->bg_comp_dat = create_component("snake_background",J_DECAL,page_dat->x_board_offset,page_dat->y_board_offset,snake_app_foreground_1_decal,&page_dat->bg_decal_dat1);
-  page_dat->button_comp_left = create_component("button_left",J_BUTTON,49,244,"",&page_dat->button_decal_left_dat);
-  page_dat->button_comp_right = create_component("button_right",J_BUTTON,147,244,"",&page_dat->button_decal_right_dat);
-  page_dat->button_comp_up = create_component("button_up",J_BUTTON,98,224,"",&page_dat->button_decal_up_dat);
-  page_dat->button_comp_down = create_component("button_down",J_BUTTON,98,273,"",&page_dat->button_decal_down_dat);
+  page_dat->button_comp_left = create_component("button_left",J_BUTTON,8,224,"",&page_dat->button_decal_left_dat);
+  page_dat->button_comp_right = create_component("button_right",J_BUTTON,158,224,"",&page_dat->button_decal_right_dat);
+  page_dat->button_comp_up = create_component("button_up",J_BUTTON,90,224,"",&page_dat->button_decal_up_dat);
+  page_dat->button_comp_down = create_component("button_down",J_BUTTON,90,273,"",&page_dat->button_decal_down_dat);
   page_dat->pellet_comp_dat = create_component("pellet",J_DECAL,0,0,icon_sg_pellet_decal,&page_dat->pellet_decal_dat);
 
 
@@ -85,10 +87,10 @@ static void snake_game_state_entry(void* o) {
 
   add_component_o(bg_fill);
   add_component_o(page_dat->bg_comp_dat);
+  add_component_o(page_dat->button_comp_down);
+  add_component_o(page_dat->button_comp_up);
   add_component_o(page_dat->button_comp_left);
   add_component_o(page_dat->button_comp_right);
-  add_component_o(page_dat->button_comp_up);
-  add_component_o(page_dat->button_comp_down);
   draw_screen_o(NULL, 0);
   k_msleep(1000);
   draw_screen_o(NULL, 0);
@@ -101,19 +103,24 @@ static void snake_game_state_entry(void* o) {
 
 void sg_draw_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l, sg_tile tile_info) {
   if(*x_l < 1 || *x_l > 10 || *y_l < 1 || *y_l > 10) return;
+  printk("Tryna print\n");
   uint16_t x_r, y_r;
   x_r = dat_ptr->x_board_offset + 20*(*x_l-1);
   y_r = dat_ptr->y_board_offset + 20*(*y_l-1);
   j_component* comp;
+  printk("Success!");
+  dat_ptr->game_array[SG_COORDS_TO_INDEX(*x_l,*y_l)] = tile_info;
   if(tile_info == SG_FILL) {
     comp = dat_ptr->snake_shape_comp_dat;
+    comp->x = x_r; comp->y = y_r;
+    draw_component(comp);
+
   } else {
     comp = dat_ptr->pellet_comp_dat;
-    dat_ptr->pellet_decal_dat.col = (x_r + y_r) ? GREEN : DARK_GREEN;
+    comp->x = x_r; comp->y = y_r;
+    dat_ptr->pellet_decal_dat.col = ((*x_l + *y_l) % 2) ? DARK_GREEN : GREEN;
+    draw_component(comp);
   }
-  dat_ptr->game_array[SG_COORDS_TO_INDEX(*x_l,*y_l)] = tile_info;
-  comp->x = x_r; comp->y = y_r;
-  draw_component(comp);
 }
 
 void sg_clear_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
@@ -133,7 +140,41 @@ void sg_clear_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
   shape_dat->col = old_col;
 }
 
+void redraw_snake(os_snake_game_ctx* dat_ptr, j_color col) {
+  j_shape_data *shape_dat = &dat_ptr->shape_dat;
+  uint8_t *game_array = dat_ptr->game_array;
+  j_color prev_col = shape_dat->col;
+  uint8_t x_l, y_l;
+  shape_dat->col = col;
+  for(int i = 0; i < 100; i++) {
+    if(game_array[i] == SG_FILL) {
+      x_l = SG_INDEX_TO_X_COORD(i);
+      y_l = SG_INDEX_TO_Y_COORD(i);
+      sg_draw_coords(dat_ptr,&x_l,&y_l,SG_FILL);
+    }
+  }
+  shape_dat->col = prev_col;
+}
+
+void draw_eyes(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
+  uint8_t x_r = dat_ptr->x_board_offset + 20*(*x_l-1); // Find local x and y coordinates
+  uint8_t y_r = dat_ptr->y_board_offset + 20*(*y_l-1);
+  j_component* comp = dat_ptr->snake_eyes_comp_dat;
+  int dir_index = dat_ptr->cur_dir_index;
+  dir_index = dir_index > 0 ? dir_index - 1 : 99;
+  int cur_dir = dat_ptr->dir_array[dir_index];
+
+  comp->x = (cur_dir <= 2) ? (x_r + 17 * (cur_dir-1)) : (x_r + 4);
+  comp->y = (cur_dir <= 2) ? (y_r + 4) : (y_r + 17 * (cur_dir-3));
+  draw_component(comp);
+  comp->x = (cur_dir <= 2) ? (x_r + 17 * (cur_dir-1)) : (x_r + 14);
+  comp->y = (cur_dir <= 2) ? (y_r + 14) : (y_r + 17 * (cur_dir-3));
+  draw_component(comp);
+}
+
 void sg_generate_pellet(os_snake_game_ctx* dat_ptr) {
+  if(100 - dat_ptr->snake_len - dat_ptr->pellet_amt <= 0) return; // not enough space
+
   j_color pellet_colors[4] = {BABY_BLUE,RED,MAGENTA,YELLOW};
   uint8_t pellet_index = sys_rand8_get();
   pellet_index = pellet_index % 100;
@@ -186,12 +227,15 @@ void sg_update_coords(uint8_t *x_l, uint8_t *y_l, sg_directions dir) {
   *y_l += dir > 2 ? -1 + 2*(dir-3) : 0;
 }
 
-int sg_update_pos(os_snake_game_ctx* dat_ptr, sg_directions dir, bool increase_size) {
+int sg_update_pos(os_snake_game_ctx* dat_ptr, sg_directions dir, bool cover_path) {
+  bool increase_size = false;
   uint8_t *x_l, *y_l, *x_fl, *y_fl; // Set up local x and y, as well as the snake tail x and y.
+
   x_fl = &dat_ptr->cur_xf;
   y_fl = &dat_ptr->cur_yf;
   x_l = &dat_ptr->cur_x;
   y_l = &dat_ptr->cur_y;
+
   uint8_t *index = &dat_ptr->cur_dir_index;
   int follow_index = (int)*index - dat_ptr->snake_len + 1;
   if(follow_index < 0) follow_index = 100 + follow_index; // Handle end of array, array loops back into itself
@@ -199,11 +243,16 @@ int sg_update_pos(os_snake_game_ctx* dat_ptr, sg_directions dir, bool increase_s
   *index %= 100;
   follow_index %= 100;
 
-  sg_update_coords(x_l,y_l,dir);
+  sg_draw_coords(dat_ptr,x_l,y_l,SG_FILL); // Fill most recent fill with white to remove eyes
+  sg_update_coords(x_l,y_l,dir); // Update coords now
+
+  // Check if out of bounds
+  if(SG_CHECK_OUT_OF_BOUNDS(*x_l,*y_l)) return 1;
 
   // Check if on same tile as pellet
   if(dat_ptr->game_array[SG_COORDS_TO_INDEX(*x_l,*y_l)] == SG_FOOD) {
     increase_size = true;
+    dat_ptr->pellet_amt--;
     sg_generate_pellet(dat_ptr);
   }
 
@@ -214,9 +263,11 @@ int sg_update_pos(os_snake_game_ctx* dat_ptr, sg_directions dir, bool increase_s
     increase_size = 0;
     return;
   }
+
+  // Overwriting old snake data from tail
   sg_directions follow_dir = dat_ptr->dir_array[follow_index];
   printk("Follow dir: %d\n", follow_index);
-  if(!(*x_l == *x_fl && *y_l == *y_fl)) {
+  if(!(*x_l == *x_fl && *y_l == *y_fl) && cover_path) { // dont clear if right up behind the tail and cover flag is not set
     sg_clear_coords(dat_ptr,x_fl,y_fl);
   }
   printk("SG_COORDS: %d %d\n\n", *x_fl, *y_fl);
@@ -224,23 +275,39 @@ int sg_update_pos(os_snake_game_ctx* dat_ptr, sg_directions dir, bool increase_s
   return 0;
 }
 
+void sg_print_array(os_snake_game_ctx* dat_ptr) {
+  for(int m = 0; m < 10; m++) {
+    for(int u = 0; u < 10; u++) {
+      printk("%d ",dat_ptr->game_array[u + m*10]);
+    }
+    printk("\n");
+  }
+}
+
 
 static enum smf_state_result snake_game_state_run(void* o) {
   os_state_ctx* ctx = (os_state_ctx*)o;
   os_snake_game_ctx* page_dat = &ctx->page_dat.snake_game_dat;
   static sg_directions cur_dir = SG_RIGHT;
-  static bool increase = true;
+  static bool pellet_flag = true;
+  static bool cover_flag = true;
   static int p = 0;
-  sg_update_pos(page_dat,cur_dir,increase);
-  for(int m = 0; m < 10; m++) {
-    for(int u = 0; u < 10; u++) {
-      printk("%d ",page_dat->game_array[u + m*10]);
+  
+
+  if(sg_update_pos(page_dat,cur_dir,cover_flag)) {
+    page_dat->bg_decal_dat1.col = WHITE;
+    page_dat->bg_decal_dat1.bg_col = GRAY;
+    draw_screen_o(NULL,0);
+    redraw_snake(page_dat,RED);
+    while(1) {
+      k_msleep(100);
     }
-    printk("\n");
   }
+  draw_eyes(page_dat,&page_dat->cur_x,&page_dat->cur_y);
+
   p++;
-  if(p > 4) increase = false;
-  if(increase) {
+  if(p > 5) pellet_flag = false;
+  if(pellet_flag || p % 20 == 1) {
     sg_generate_pellet(page_dat);
   }
 
@@ -254,7 +321,7 @@ static enum smf_state_result snake_game_state_run(void* o) {
       j_button_data* button_dat = (j_button_data*)PRESSED_BUTTON->dat2;
       if(button_dat != NULL) {
         if(1) {
-          switch(button_dat->tag) {
+          switch(button_dat->tag) { // Its not the best way, but it works
             case 0: // Left
               cur_dir = SG_LEFT;
               break;
