@@ -52,7 +52,7 @@ typedef enum {
 
 #define LCD_MAX_HEIGHT (uint16_t)0x00EF 
 #define LCD_MAX_LENGTH (uint16_t)0x013F
-#define LCD_BUF_DIV 2
+#define LCD_BUF_DIV 4
 /*----------------------------------------------------------
                 Buffer / Text Safety Defines
 ----------------------------------------------------------*/
@@ -103,7 +103,8 @@ typedef enum {
   SAND = 0x00FFF2D0,
   TERRACOTTA = 0x00E36A6A,
   DARK_GRAY = 0x00424242,
-  DIAMOND_BLUE = 0x002B94FC
+  DIAMOND_BLUE = 0x002B94FC,
+  DARK_GREEN = 0x0000bd00
 } j_color;
 
 
@@ -190,9 +191,11 @@ typedef struct {
 typedef struct {
   j_color col, bg_col, border_col;
   j_font_size font_size;
+  int8_t tag; // Used for grouping certain buttons together
   uint8_t border_width, pressed_status; // Pressed_status is not pressed (0) and pressed (1)
   uint16_t length, height;
   uint8_t* decal_dat; // set to decal for decal writing, or NULL for text
+  j_component* decal_ptr;
 } j_button_data;
 
 typedef struct {
@@ -356,6 +359,8 @@ void draw_component(j_component* component);
  */
 j_component* lcd_check_button_pressed(uint16_t x, uint16_t y, uint8_t buffer_amt);
 
+j_component* lcd_check_button_pressed_filter(uint16_t x, uint16_t y, uint8_t buffer_amt, int8_t tag_filter);
+
 /**
  * @brief Will refresh the display to make the button look "clicked".
  * 
@@ -380,5 +385,9 @@ void update_text(j_component* text_component, char* new_str);
  * @param y Y coordinate return value 
  */
 void poll_touch(uint16_t* x, uint16_t* y);
+
+int poll_touch_timeout(uint16_t* x, uint16_t* y, int timeout);
+
+void free_component(j_component* comp);
 
 #endif

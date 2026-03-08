@@ -3,6 +3,7 @@
                 Global Zephyr Variables Struct
 ----------------------------------------------------------*/
 static struct J_CONTAINER J_CONTAINER_t = {0};
+static j_component* temp_component = NULL;
 
 /*----------------------------------------------------------
                           Buffers
@@ -193,8 +194,13 @@ void draw_handle_button(j_component* comp) {
 
     uint16_t decal_x_len = (decal_dat[0] << 8) | decal_dat[1];
     uint16_t decal_y_len = (decal_dat[2] << 8) | decal_dat[3];
-    j_component* decal = create_component("",J_DECAL,comp->x + (button_dat->length)/2 - decal_x_len/2,comp->y + (button_dat->height)/2 - decal_y_len/2,decal_dat,&decal_specific_dat);
-    ram_draw_image_helper(decal->x, decal->y, decal, NULL);
+    // j_component* decal = create_component("",J_DECAL,comp->x + (button_dat->length)/2 - decal_x_len/2,comp->y + (button_dat->height)/2 - decal_y_len/2,decal_dat,&decal_specific_dat);
+    button_dat->decal_ptr->x = comp->x + (button_dat->length)/2 - decal_x_len/2;
+    button_dat->decal_ptr->y = comp->y + (button_dat->height)/2 - decal_y_len/2;
+    button_dat->decal_ptr->dat = decal_dat;
+    button_dat->decal_ptr->dat2 = &decal_specific_dat;
+    // printk("\n\nDebug: %d %d %d %d\n%d %d %d\n",decal->x,decal->y,decal_dat[1],decal_dat[3], comp->y, button_dat->height, decal_y_len);
+    ram_draw_image_helper(button_dat->decal_ptr->x, button_dat->decal_ptr->y, button_dat->decal_ptr, NULL);
   }
 }
 
@@ -694,8 +700,19 @@ void ram_draw_image_helper(int x_coord, int y_coord, j_component* comp, j_animat
 }
 
 j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat, void* dat2) {
+  printk("\nCreate_component y: %d\n\n",y);
   j_component* ret = malloc(sizeof(j_component));
-  if(ret == NULL) return NULL;
+  if(ret == NULL) {
+    while(1) {
+      printk("NULL!\n\n");
+    }
+  }
+  if(type == J_BUTTON) {
+    j_button_data* button_dat = (j_button_data*)dat2;
+    if(button_dat != NULL) {
+      button_dat->decal_ptr = button_dat->decal_dat == NULL ? NULL : create_component("",J_DECAL,0,0,NULL,NULL);
+    }
+  }
   ret->name = name;
   ret->type = type;
   ret->x = x;
@@ -836,6 +853,34 @@ j_component* lcd_check_button_pressed(uint16_t x, uint16_t y, uint8_t buffer_amt
   return NULL;
 }
 
+j_component* lcd_check_button_pressed_filter(uint16_t x, uint16_t y, uint8_t buffer_amt, int8_t tag_filter) {
+  j_component* cur = comp_linked_list.start;
+  if(tag_filter >= 0) {
+    for(int i = 0; i < MAX_LINKED_LIST_SIZE; i++) {
+      if(cur == NULL) return NULL;
+      if(cur->type == J_BUTTON && cur->dat2 != NULL) {
+        j_button_data* button_dat = (j_button_data*)(cur->dat2);
+        if(button_dat->tag == tag_filter && IS_POINT_IN_BOX_BUFFER(x,y,cur->x,cur->y,button_dat->length,button_dat->height,buffer_amt)) {
+          return cur;
+        }
+      }
+      cur = cur->next_ptr;
+    }
+  } else {
+    for(int i = 0; i < MAX_LINKED_LIST_SIZE; i++) {
+      if(cur == NULL) return NULL;
+      if(cur->type == J_BUTTON && cur->dat2 != NULL) {
+        j_button_data* button_dat = (j_button_data*)(cur->dat2);
+        if(IS_POINT_IN_BOX_BUFFER(x,y,cur->x,cur->y,button_dat->length,button_dat->height,buffer_amt)) {
+          return cur;
+        }
+      }
+      cur = cur->next_ptr;
+    }
+  }
+  return NULL;
+}
+
 uint8_t press_button_visual(j_component* button) {
   if(button != NULL) {
     j_button_data* button_dat = (j_button_data*)(button->dat2);
@@ -844,6 +889,7 @@ uint8_t press_button_visual(j_component* button) {
     draw_component(button);
     k_msleep(200);
     button_dat->pressed_status = 0;
+    printk("Drawing button AGAIN");
     draw_component(button);
     printk("Exited visual\n");
     return 1;
@@ -873,6 +919,7 @@ void update_text(j_component* text_component, char* new_str) {
 }
 
 void add_component_o(j_component* component) {
+  if(component == NULL || component->next_ptr != NULL || component->prev_ptr != NULL || component == comp_linked_list.end) return;
   if(comp_linked_list.start == NULL) {
     comp_linked_list.start = comp_linked_list.end = component;
     return;
@@ -964,16 +1011,55 @@ void poll_touch(uint16_t* x, uint16_t* y) {
   *y = y_pos;
 }
 
+int poll_touch_timeout(uint16_t* x, uint16_t* y, int timeout) {
+  uint16_t x_pos, y_pos;
+  x_pos = y_pos = -1;
+  int i = 0;
+  if(timeout <= 0) return 0;
+  while(i < timeout) {
+    uint8_t touch_response;
+    uint32_t position;
+    touch_control_cmd_rsp(TD_STATUS,&touch_response);
+    if(touch_response == 1) {
+      position = get_pos();
+      x_pos = (uint16_t)(position >> 16);
+      y_pos = (uint16_t)(position);
+      break;
+    }
+    k_msleep(1);
+    i++;
+  }
+  *x = x_pos;
+  *y = y_pos;
+  return i;
+}
+
 void clear_draw_buffer() {
   j_component* cur = comp_linked_list.start;
   j_component* next_cur;
+  if(cur == NULL) printk("Its null\n");
   for(int i = 0; i < MAX_LINKED_LIST_SIZE; i++) {
     if(cur == NULL) break;
     next_cur = cur->next_ptr;
     cur->next_ptr = NULL;
     cur->prev_ptr = NULL;
-    free(cur);
+    printf("deleted %s\n",cur->name);
+    free_component(cur);
     cur = next_cur;
   }
   comp_linked_list.start = comp_linked_list.end = NULL;
+}
+
+void free_component(j_component* comp) {
+  if(comp == NULL) return;
+  if(comp->type == J_BUTTON) {
+    j_button_data* button_dat = (j_button_data*)comp->dat2;
+    printk("\n\nPointer after: %p\n",(void*)button_dat);
+    if(button_dat != NULL && button_dat->decal_ptr != NULL) {
+      free(button_dat->decal_ptr);
+      button_dat->decal_ptr = NULL;
+    }
+  }
+  free(comp);
+  comp = NULL;
 }
