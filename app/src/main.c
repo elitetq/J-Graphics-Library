@@ -64,7 +64,11 @@ int main(void) {
 
   while(1) {
     int ret = state_machine_run();
-    if(0>ret) return 0;
+    if(0>ret) {
+      printk("Error occured\n");
+      return 0;
+    }
+    printk("REFRESH\n");
     k_msleep(SLEEP_MS);
   }
   

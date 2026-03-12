@@ -82,7 +82,9 @@ void shape_draw_rectangle(j_component* comp, j_shape_data* shape_dat, j_animatio
       prev_y_l = y;
       prev_x2_l = x2;
       prev_y2_l = y2;
+      bool final_draw = false;
       while(1) {
+        printk("Animation:  ");
         x_l = (x*(100-percentage) + anim_dat->x_low*(percentage))/100;
         y_l = (y*(100-percentage) + anim_dat->y_low*(percentage))/100;
         x2_l = (x2*(100-percentage) + anim_dat->x_high*(percentage))/100;
@@ -109,12 +111,13 @@ void shape_draw_rectangle(j_component* comp, j_shape_data* shape_dat, j_animatio
         prev_y_l = y_l;
         prev_x2_l = x2_l;
         prev_y2_l = y2_l;
+        printk("Anim finish\n");
 
         k_msleep(10);
         percentage += increment;
+        if(final_draw) break;
         if(percentage > 100) {
-          if(100 % increment == 0) break;
-          increment = 1;
+          final_draw = true;
           percentage = 100;
         }
       }

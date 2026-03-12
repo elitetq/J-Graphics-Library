@@ -18,6 +18,8 @@ static const struct smf_state sos_states[] = {
   [ABOUT_PAGE] = SMF_CREATE_STATE(about_page_state_entry, about_page_state_run, about_page_state_exit, NULL, NULL),
   [LOCK_SCREEN] = SMF_CREATE_STATE(lock_screen_state_entry, lock_screen_state_run, lock_screen_state_exit, NULL, NULL),
   [SNAKE_GAME] = SMF_CREATE_STATE(snake_game_state_entry, snake_game_state_run, snake_game_state_exit, NULL, NULL),
+  [SNAKE_RESET] = SMF_CREATE_STATE(snake_reset_state_entry, snake_reset_state_run, snake_reset_state_exit, NULL, NULL),
+  [START_UP] = SMF_CREATE_STATE(start_up_state_entry, start_up_state_run, start_up_state_exit, NULL, NULL),
 };
 static os_state_ctx sos_object;
 static uint16_t x, y;
@@ -40,7 +42,7 @@ void state_machine_init() {
   draw_color_fs(BLACK);
   set_theme(VOID);
   sos_object.os_flags = 0b10000000;
-  smf_set_initial(SMF_CTX(&sos_object),&sos_states[SNAKE_GAME]);
+  smf_set_initial(SMF_CTX(&sos_object),&sos_states[START_UP]);
 }
 
 int state_machine_run() {
@@ -51,11 +53,98 @@ int state_machine_run() {
 /*----------------------------------------------------------
                 State Function Definitions
 ----------------------------------------------------------*/
+static void start_up_state_entry(void* o) {
+  os_state_ctx* ctx = (os_state_ctx*)o;
+  memset(&ctx->page_dat,0,sizeof(os_start_up_ctx));
+  os_start_up_ctx* page_dat = &ctx->page_dat.start_up_dat;
+
+  page_dat->anim_dat = (j_animation_data){.bg_col = J_STYLE_BG_COL, .increment_speed = 5, .percentage = 0, .type = FADE_IN};
+  page_dat->logo_decal_dat = (j_decal_data){.animation_dat = &page_dat->anim_dat, .bg_col = J_STYLE_BG_COL, .col = J_STYLE_COL};
+  
+  page_dat->bar_dat = (j_bar_data){.bg_col = J_STYLE_BG_COL, .col = J_STYLE_COL, .height = 5, .length = 120, .type = J_BAR_LR};
+
+  page_dat->text_dat = (j_text_data){.bg_col = J_STYLE_BG_COL, .col = J_STYLE_COL, .centering = J_CENTER, .font_size = FONT_SMALL};
+
+  page_dat->bg_comp_dat = create_component("bg comp", J_FILL, 0, 0, &J_STYLE_BG_COL, NULL);
+  page_dat->bar_val = 0; // Initialize bar to 0 data
+
+  page_dat->loading_bar_comp_dat = create_component("loading bar", J_BAR, 60, 180, &page_dat->bar_val, &page_dat->bar_dat);
+
+  page_dat->logo_comp_dat = create_component("logo sojourn", J_IMAGE, 120-50, 160-44, sojourn_logo_img, &page_dat->anim_dat);
+
+  page_dat->text_comp_dat = create_component("", J_TEXT, 120, 200, "test...", &page_dat->text_dat);
+
+  page_dat->start_count = 0;
+
+  add_component_o(page_dat->bg_comp_dat);
+  add_component_o(page_dat->loading_bar_comp_dat);
+  add_component_o(page_dat->logo_comp_dat);
+  draw_component(page_dat->logo_comp_dat);
+  page_dat->logo_comp_dat->y = 160-75;
+  page_dat->logo_comp_dat->dat2 = NULL; // Clear animation data
+
+  add_component_o(page_dat->text_comp_dat);
+
+  draw_screen_o(NULL,0);
+}
+
+static enum smf_state_result start_up_state_run(void* o) {
+  os_state_ctx* ctx = (os_state_ctx*)o;
+  os_start_up_ctx* page_dat = &ctx->page_dat.start_up_dat;
+  char* status_texts[3] = {"Loading assets...","Flipping pancakes...","Making smoothies..."};
+  uint8_t *start_count = &page_dat->start_count;
+  int i = 0;
+  page_dat->bar_val = 0;
+  update_text(page_dat->text_comp_dat,status_texts[*start_count]);
+  while(i < 100) {
+    i++;
+    page_dat->bar_val += 1;
+    draw_component(page_dat->loading_bar_comp_dat);
+    k_msleep(10);
+  }
+  (*start_count)++;
+  if((*start_count) == 3) {
+    smf_set_state(SMF_CTX(&sos_object),&sos_states[LOCK_SCREEN]);
+  }
+
+  return SMF_EVENT_HANDLED;
+}
+
+static void start_up_state_exit(void* o) {
+  clear_draw_buffer();
+}
+
+static void snake_reset_state_entry(void* o) {
+  k_msleep(10);
+  return;
+}
+
+static enum smf_state_result snake_reset_state_run(void* o) {
+  printk("Entered state here");
+  smf_set_state(SMF_CTX(&sos_object),&sos_states[SNAKE_GAME]);
+  return SMF_EVENT_HANDLED;
+}
+
+static void snake_reset_state_exit(void* o) {
+  return;
+}
 
 static void snake_game_state_entry(void* o) {
   os_state_ctx* ctx = (os_state_ctx*)o;
   memset(&ctx->page_dat,0,sizeof(os_snake_game_ctx));
   os_snake_game_ctx* page_dat = &ctx->page_dat.lock_screen_dat;
+
+
+  page_dat->cur_dir = SG_RIGHT;
+  page_dat->dir_global = SG_RIGHT;
+  page_dat->pellet_flag = true;
+  page_dat->cover_flag = true;
+
+  page_dat->announce_text_dat = J_STYLE_TEXT_DEFAULT(J_CENTER,FONT_MEDIUM);
+  page_dat->score_text_dat = J_STYLE_TEXT_DEFAULT(J_CENTER,FONT_MEDIUM);
+  page_dat->announce_bg_dat = J_STYLE_BUTTON_STATUS_MESSAGE;
+  page_dat->announce_bg_dat.length = 220;
+  page_dat->announce_button_dat = (j_button_data){.bg_col = J_STYLE_COL, .col = J_STYLE_BG_COL, .border_col = J_STYLE_ACCENT_COL, .border_width = 2, .decal_dat = NULL, .font_size = FONT_MEDIUM, .height = 30, .length = 100, .pressed_status = 0};
 
   page_dat->bg_decal_dat1 = (j_decal_data){.animation_dat = NULL, .bg_col = DARK_GREEN, .col = GREEN};
   page_dat->pellet_decal_dat = (j_decal_data){.animation_dat = NULL, .bg_col = GREEN, .col = GREEN};
@@ -71,6 +160,13 @@ static void snake_game_state_entry(void* o) {
 
 
   page_dat->x_board_offset = page_dat->y_board_offset = 20;
+
+  strcpy(page_dat->user_score_str,"Score: 0");
+
+  page_dat->score_text_comp_dat = create_component("score_text",J_TEXT,120,0,page_dat->user_score_str,&page_dat->score_text_dat);
+  page_dat->announce_but_comp_dat1 = create_component("R_announce_button1",J_BUTTON,10,290,"Retry...",&page_dat->announce_button_dat);
+  page_dat->announce_but_comp_dat2 = create_component("E_announce_button2",J_BUTTON,130,290,"Exit...",&page_dat->announce_button_dat);
+  page_dat->announce_bg_comp_dat = create_component("announce_bg",J_BUTTON,10,230,"You lost! Try again?",&page_dat->announce_bg_dat);
   page_dat->snake_shape_comp_dat = create_component("snake_shape",J_SHAPE,0,0,&page_dat->shape_dat,NULL);
   page_dat->snake_eyes_comp_dat = create_component("snake_eyes",J_SHAPE,0,0,&page_dat->shape_dat2,NULL);
   j_component* bg_fill = create_component("bg_col",J_FILL,0,0,&J_STYLE_BG_COL,NULL);
@@ -81,8 +177,6 @@ static void snake_game_state_entry(void* o) {
   page_dat->button_comp_down = create_component("button_down",J_BUTTON,90,273,"",&page_dat->button_decal_down_dat);
   page_dat->pellet_comp_dat = create_component("pellet",J_DECAL,0,0,icon_sg_pellet_decal,&page_dat->pellet_decal_dat);
 
-
-
   sg_init(page_dat);
 
   add_component_o(bg_fill);
@@ -91,15 +185,36 @@ static void snake_game_state_entry(void* o) {
   add_component_o(page_dat->button_comp_up);
   add_component_o(page_dat->button_comp_left);
   add_component_o(page_dat->button_comp_right);
+  add_component_o(page_dat->score_text_comp_dat);
   draw_screen_o(NULL, 0);
-  k_msleep(1000);
-  draw_screen_o(NULL, 0);
-  printk("Entered snake!\n");
 }
 
 /*----------------------------------------------------------
                 Snake Game Functions
 ----------------------------------------------------------*/
+
+void int_to_str(int num, char* str_ret, int max_len) {
+  uint8_t index = 0;
+  char temp = 0;
+  do {
+    str_ret[index] = (num % 10) + '0';
+    num /= 10;
+    index++;
+  } while(num && index < (max_len-1));
+
+  // Reversing array
+  int j, k;
+  j = 0;
+  k = index-1;
+  while(j < k) {
+    temp = str_ret[j];
+    str_ret[j] = str_ret[k];
+    str_ret[k] = temp;
+    j++;
+    k--;
+  }
+  str_ret[index] = 0; // Null operator
+}
 
 void sg_draw_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l, sg_tile tile_info) {
   if(*x_l < 1 || *x_l > 10 || *y_l < 1 || *y_l > 10) return;
@@ -173,7 +288,7 @@ void draw_eyes(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
 }
 
 void sg_generate_pellet(os_snake_game_ctx* dat_ptr) {
-  if(100 - dat_ptr->snake_len - dat_ptr->pellet_amt <= 0) return; // not enough space
+  if(99 - dat_ptr->snake_len - dat_ptr->pellet_amt <= 0) return; // not enough space
 
   j_color pellet_colors[4] = {BABY_BLUE,RED,MAGENTA,YELLOW};
   uint8_t pellet_index = sys_rand8_get();
@@ -198,7 +313,6 @@ void sg_generate_pellet(os_snake_game_ctx* dat_ptr) {
   }
   dat_ptr->temp_pellet_x = SG_INDEX_TO_X_COORD(local_i);
   dat_ptr->temp_pellet_y = SG_INDEX_TO_Y_COORD(local_i);
-  // sg_draw_coords(dat_ptr,&dat_ptr->temp_pellet_x,&dat_ptr->temp_pellet_y,SG_FOOD);
   sg_draw_coords(dat_ptr,&dat_ptr->temp_pellet_x,&dat_ptr->temp_pellet_y,SG_FOOD);
   dat_ptr->pellet_amt++;
 }
@@ -229,6 +343,7 @@ void sg_update_coords(uint8_t *x_l, uint8_t *y_l, sg_directions dir) {
 
 int sg_update_pos(os_snake_game_ctx* dat_ptr, sg_directions dir, bool cover_path) {
   bool increase_size = false;
+  char score_str[10];
   uint8_t *x_l, *y_l, *x_fl, *y_fl; // Set up local x and y, as well as the snake tail x and y.
 
   x_fl = &dat_ptr->cur_xf;
@@ -247,13 +362,19 @@ int sg_update_pos(os_snake_game_ctx* dat_ptr, sg_directions dir, bool cover_path
   sg_update_coords(x_l,y_l,dir); // Update coords now
 
   // Check if out of bounds
-  if(SG_CHECK_OUT_OF_BOUNDS(*x_l,*y_l)) return 1;
+  if(SG_CHECK_OUT_OF_BOUNDS(*x_l,*y_l) || ((dat_ptr->game_array[SG_COORDS_TO_INDEX(*x_l,*y_l)] == SG_FILL) && SG_COORDS_TO_INDEX(*x_l,*y_l) != SG_COORDS_TO_INDEX(*x_fl,*y_fl))) return 1;
 
   // Check if on same tile as pellet
   if(dat_ptr->game_array[SG_COORDS_TO_INDEX(*x_l,*y_l)] == SG_FOOD) {
+    dat_ptr->user_score += 1000;
     increase_size = true;
     dat_ptr->pellet_amt--;
     sg_generate_pellet(dat_ptr);
+
+    int_to_str(dat_ptr->user_score,score_str,10);
+    strcpy(dat_ptr->user_score_str,"Score: ");
+    strcat(dat_ptr->user_score_str,score_str);
+    update_text(dat_ptr->score_text_comp_dat,dat_ptr->user_score_str);
   }
 
   sg_draw_coords(dat_ptr,x_l,y_l,SG_FILL);
@@ -288,26 +409,46 @@ void sg_print_array(os_snake_game_ctx* dat_ptr) {
 static enum smf_state_result snake_game_state_run(void* o) {
   os_state_ctx* ctx = (os_state_ctx*)o;
   os_snake_game_ctx* page_dat = &ctx->page_dat.snake_game_dat;
-  static sg_directions cur_dir = SG_RIGHT;
-  static bool pellet_flag = true;
-  static bool cover_flag = true;
-  static int p = 0;
+  sg_directions *dir_global = &page_dat->dir_global;
+  sg_directions *cur_dir = &page_dat->cur_dir;
+  bool *pellet_flag = &page_dat->pellet_flag;
+  bool *cover_flag = &page_dat->cover_flag;
+  int *p = &page_dat->pellet_timer;
   
 
-  if(sg_update_pos(page_dat,cur_dir,cover_flag)) {
+  if(sg_update_pos(page_dat,*cur_dir,*cover_flag)) {
+    // Loss condition
     page_dat->bg_decal_dat1.col = WHITE;
     page_dat->bg_decal_dat1.bg_col = GRAY;
+    remove_component_o(page_dat->button_comp_down);
+    remove_component_o(page_dat->button_comp_up);
+    remove_component_o(page_dat->button_comp_left);
+    remove_component_o(page_dat->button_comp_right);
+    add_component_o(page_dat->announce_but_comp_dat1);
+    add_component_o(page_dat->announce_but_comp_dat2);
+    add_component_o(page_dat->announce_bg_comp_dat);
     draw_screen_o(NULL,0);
     redraw_snake(page_dat,RED);
-    while(1) {
-      k_msleep(100);
+    poll_touch(&x,&y);
+    j_component* PRESSED_BUTTON = lcd_check_button_pressed(x,y,8);
+    if(press_button_visual(PRESSED_BUTTON)) {
+      if(PRESSED_BUTTON->name[0] == 'R') { // Retry
+        smf_set_state(SMF_CTX(&sos_object),&sos_states[SNAKE_RESET]);
+        return SMF_EVENT_HANDLED;
+      } else {
+        smf_set_state(SMF_CTX(&sos_object),&sos_states[HOME_SCREEN]);
+        return SMF_EVENT_HANDLED;
+      }
     }
+    return SMF_EVENT_HANDLED;
+  } else {
+    *dir_global = *cur_dir;
   }
   draw_eyes(page_dat,&page_dat->cur_x,&page_dat->cur_y);
 
-  p++;
-  if(p > 5) pellet_flag = false;
-  if(pellet_flag || p % 20 == 1) {
+  (*p)++;
+  if(*p > 6) *pellet_flag = false;
+  if(*pellet_flag || *p % 20 == 1) {
     sg_generate_pellet(page_dat);
   }
 
@@ -323,16 +464,16 @@ static enum smf_state_result snake_game_state_run(void* o) {
         if(1) {
           switch(button_dat->tag) { // Its not the best way, but it works
             case 0: // Left
-              cur_dir = SG_LEFT;
+              if(*dir_global != SG_RIGHT) *cur_dir = SG_LEFT;
               break;
             case 1: // Right
-              cur_dir = SG_RIGHT;
+              if(*dir_global != SG_LEFT) *cur_dir = SG_RIGHT;
               break;
             case 2: // Up
-              cur_dir = SG_UP;
+              if(*dir_global != SG_DOWN) *cur_dir = SG_UP;
               break;
             default: // Down
-              cur_dir = SG_DOWN;
+              if(*dir_global != SG_UP) *cur_dir = SG_DOWN;
               break;
           }
         } else {
@@ -345,6 +486,18 @@ static enum smf_state_result snake_game_state_run(void* o) {
 }
 
 static void snake_game_state_exit(void* o) {
+  os_state_ctx* ctx = (os_state_ctx*)o;
+  os_snake_game_ctx* page_dat = &ctx->page_dat.snake_game_dat;
+  add_component_o(page_dat->announce_but_comp_dat1);
+  add_component_o(page_dat->announce_but_comp_dat2);
+  add_component_o(page_dat->button_comp_down);
+  add_component_o(page_dat->button_comp_up);
+  add_component_o(page_dat->button_comp_left);
+  add_component_o(page_dat->button_comp_right);
+  add_component_o(page_dat->pellet_comp_dat);
+  add_component_o(page_dat->snake_eyes_comp_dat);
+  add_component_o(page_dat->snake_shape_comp_dat);
+  
   clear_draw_buffer();
 
 }
@@ -563,6 +716,9 @@ static void home_screen_state_entry(void* o) {
   page_dat->ctx_pressed = 0;
   page_dat->ctx_offset = 0;
 
+  page_dat->shape_dat = (j_shape_data){.col = WHITE, .bg_col = BLACK, .centering = J_LEFT, .height = 1, .length = 1, .type = J_RECTANGLE};
+  page_dat->shape_anim_dat = (j_animation_data){.x_high = 239, .x_low = 0, .y_high = 319, .y_low = 0, .bg_col = WHITE, .increment_speed = 20, .percentage = 0, .type = RESIZE};
+
   page_dat->button_dat_2 = (j_button_data){.bg_col = ctx->global_col, .border_col = ctx->global_col, .col = ctx->global_bg_col, .border_width = 0,
     .decal_dat = icon_shutdown_decal,
     .font_size = FONT_SMALL, .height = 31, .length = 31, .pressed_status = 0, .tag = 2};
@@ -580,9 +736,10 @@ static void home_screen_state_entry(void* o) {
   j_component* PLANET_DECAL = create_component("planet_decal",J_DECAL,0,220,planet_gui_decal,&page_dat->banner_decal_dat);
   j_component* CONFIG_BUTTON = create_component("button1",J_BUTTON,10,4,"",&page_dat->button_dat_1);
   j_component* POWER_BUTTON = create_component("button2",J_BUTTON,200,4,"",&page_dat->button_dat_2);
-  j_component* APP1 = create_component("whatsyapp",J_BUTTON,13,90,"",&page_dat->app3);
-  j_component* APP2 = create_component("calc",J_BUTTON,88,90,"",&page_dat->app1);
-  j_component* APP3 = create_component("snake",J_BUTTON,163,90,"",&page_dat->app2);
+  j_component* APP1 = create_component("snake",J_BUTTON,13,90,"",&page_dat->app3);
+  j_component* APP2 = create_component("whatsyapp",J_BUTTON,88,90,"",&page_dat->app1);
+  j_component* APP3 = create_component("calc",J_BUTTON,163,90,"",&page_dat->app2);
+  page_dat->shape = create_component("shape_anim",J_SHAPE,0,0,&page_dat->shape_dat,&page_dat->shape_anim_dat);
 
   add_component_o(FILL);
   add_component_o(BANNER_DECAL);
@@ -599,6 +756,7 @@ static void home_screen_state_entry(void* o) {
 }
 
 static enum smf_state_result home_screen_state_run(void* o) {
+  printk("WAAAAT\n");
   static char* ctx_strings[4] = {"Themes","About","Shut down","Sign out"};
   os_state_ctx* ctx = (os_state_ctx*)o;
   os_home_screen_ctx* page_dat = &ctx->page_dat.home_screen_dat;
@@ -609,10 +767,20 @@ static enum smf_state_result home_screen_state_run(void* o) {
     j_button_data* button_dat = (j_button_data*)PRESSED_BUTTON->dat2;
     switch(button_dat->tag) {
       case 0: // Pressed apps
-      printk("Pressed ctx\n");
+        page_dat->shape->x = PRESSED_BUTTON->x + 31;
+        page_dat->shape->y = PRESSED_BUTTON->y + 31;
+        j_shape_data* shape_dat = &page_dat->shape_dat;
+        printk("%s\n",PRESSED_BUTTON->name);
+        shape_dat->col = button_dat->col;
+        shape_dat->bg_col = button_dat->col;
+        draw_component(page_dat->shape);
+        shape_dat->col = J_STYLE_BG_COL;
+        shape_dat->bg_col = J_STYLE_BG_COL;
+        draw_component(page_dat->shape);
+        smf_set_state(SMF_CTX(&sos_object),&sos_states[SNAKE_GAME]);
         break;
       case 1: // Pressed ctx
-      sos_smf_states state_array[4] = {THEME_PAGE,ABOUT_PAGE,SHUT_DOWN,RESTART};
+      sos_smf_states state_array[4] = {THEME_PAGE,ABOUT_PAGE,SHUT_DOWN,LOCK_SCREEN};
       printk("Pressed power/config\n");
       smf_set_state(SMF_CTX(&sos_object),&sos_states[state_array[(PRESSED_BUTTON == page_dat->ctx_button2) + page_dat->ctx_offset]]);
       return SMF_EVENT_HANDLED;

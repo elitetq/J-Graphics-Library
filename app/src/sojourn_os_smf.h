@@ -46,6 +46,13 @@ static void snake_game_state_entry(void* o);
 static enum smf_state_result snake_game_state_run(void* o);
 static void snake_game_state_exit(void* o);
 
+static void snake_reset_state_entry(void* o);
+static enum smf_state_result snake_reset_state_run(void* o);
+static void snake_reset_state_exit(void* o);
+
+static void start_up_state_entry(void* o);
+static enum smf_state_result start_up_state_run(void* o);
+static void start_up_state_exit(void* o);
 /*----------------------------------------------------------
                 Component Style Defines
 ----------------------------------------------------------*/
@@ -82,6 +89,7 @@ typedef struct {
   j_button_data app1, app2, app3;
   j_button_data ctx_menu_dat, ctx_menu_button_dat;
   j_shape_data shape_dat;
+  j_animation_data shape_anim_dat;
   bool ctx_pressed;
   uint8_t ctx_offset; // For ctx button tracking
   j_component *ctx_button1, *ctx_button2, *ctx_menu_background, *shape;
@@ -121,20 +129,31 @@ typedef struct {
   uint8_t game_array[100]; // Array showing where the current snake is
   uint8_t dir_array[100]; // Stores the directions taken by user so that the program can follow
   uint8_t cur_x, cur_y, cur_xf, cur_yf, snake_len, cur_dir_index, pellet_amt;
-  sg_directions next_dir;
-  uint16_t user_score;
+  sg_directions next_dir, cur_dir, dir_global;
+  bool pellet_flag, cover_flag;
+  int pellet_timer; // Used to spawn pellets in the game periodically
+  uint32_t user_score;
+  char user_score_str[20];
   uint8_t temp_pellet_x, temp_pellet_y;
 
   // Visual variables
   uint16_t DELAY_PER_CPU_CYCLE;
   uint8_t x_board_offset, y_board_offset;
   j_decal_data bg_decal_dat1, bg_decal_dat2, pellet_decal_dat;
-  j_button_data button_decal_dat, button_decal_left_dat, button_decal_right_dat, button_decal_up_dat, button_decal_down_dat;
-  j_component *bg_comp_dat, *snake_shape_comp_dat, *snake_eyes_comp_dat, *button_comp_left, *button_comp_right, *button_comp_up, *button_comp_down, *pellet_comp_dat;
+  j_text_data score_text_dat, announce_text_dat;
+  j_button_data button_decal_dat, button_decal_left_dat, button_decal_right_dat, button_decal_up_dat, button_decal_down_dat, announce_button_dat, announce_bg_dat;
+  j_component *bg_comp_dat, *snake_shape_comp_dat, *snake_eyes_comp_dat, *button_comp_left, *button_comp_right, *button_comp_up, *button_comp_down, *pellet_comp_dat, *announce_but_comp_dat1, *announce_but_comp_dat2, *score_text_comp_dat, *announce_bg_comp_dat;
   j_shape_data shape_dat, shape_dat2;
 } os_snake_game_ctx;
 
-
+typedef struct {
+  j_animation_data anim_dat;
+  j_decal_data logo_decal_dat;
+  j_text_data text_dat;
+  j_bar_data bar_dat;
+  uint8_t bar_val, start_count; // Start count is a variable for switching text in the loading screen
+  j_component *bg_comp_dat, *logo_comp_dat, *text_comp_dat, *loading_bar_comp_dat;
+} os_start_up_ctx;
 /*----------------------------------------------------------
             Sojourn OS Context Structs / Enums
 ----------------------------------------------------------*/
@@ -145,7 +164,9 @@ typedef enum {
   THEME_PAGE,
   SHUT_DOWN,
   RESTART,
-  SNAKE_GAME
+  SNAKE_GAME,
+  SNAKE_RESET,
+  START_UP
 } sos_smf_states;
 
 typedef union {
@@ -153,6 +174,7 @@ typedef union {
   os_lock_screen_ctx lock_screen_dat;
   os_home_screen_ctx home_screen_dat;
   os_snake_game_ctx snake_game_dat;
+  os_start_up_ctx start_up_dat;
 } page_ctx;
 
 typedef struct {
