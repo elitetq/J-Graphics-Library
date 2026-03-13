@@ -66,7 +66,6 @@ int main(void) {
       printk("Error occured\n");
       return 0;
     }
-    printk("REFRESH\n");
     k_msleep(SLEEP_MS);
   }
   

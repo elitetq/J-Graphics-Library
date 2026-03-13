@@ -56,6 +56,7 @@ int state_machine_run() {
                 State Function Definitions
 ----------------------------------------------------------*/
 static void theme_page_state_entry(void* o) {
+  // Dereference context variable, so I can grab the page data
   os_state_ctx* ctx = (os_state_ctx*)o;
   memset(&ctx->page_dat,0,sizeof(os_theme_page_ctx));
   os_theme_page_ctx* page_dat = (os_theme_page_ctx*)&ctx->page_dat.theme_page_dat;
@@ -200,6 +201,7 @@ static enum smf_state_result start_up_state_run(void* o) {
   char* status_texts[3] = {"Loading assets...","Flipping pancakes...","Making smoothies..."};
   uint8_t *start_count = &page_dat->start_count;
   int i = 0;
+
   page_dat->bar_val = 0;
   update_text(page_dat->text_comp_dat,status_texts[*start_count]);
   while(i < 100) {
