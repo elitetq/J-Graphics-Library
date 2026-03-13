@@ -53,6 +53,14 @@ static void snake_reset_state_exit(void* o);
 static void start_up_state_entry(void* o);
 static enum smf_state_result start_up_state_run(void* o);
 static void start_up_state_exit(void* o);
+
+static void shut_down_state_entry(void* o);
+static enum smf_state_result shut_down_state_run(void* o);
+static void shut_down_state_exit(void* o);
+
+static void theme_page_state_entry(void* o);
+static enum smf_state_result theme_page_state_run(void* o);
+static void theme_page_state_exit(void* o);
 /*----------------------------------------------------------
                 Component Style Defines
 ----------------------------------------------------------*/
@@ -154,6 +162,20 @@ typedef struct {
   uint8_t bar_val, start_count; // Start count is a variable for switching text in the loading screen
   j_component *bg_comp_dat, *logo_comp_dat, *text_comp_dat, *loading_bar_comp_dat;
 } os_start_up_ctx;
+
+typedef struct {
+  j_text_data text_dat;
+  j_component *text_comp_dat, *bg_comp_dat;
+} os_shut_down_ctx;
+
+typedef struct {
+  uint8_t num_buttons; // keep track in the code
+  j_text_data text_dat1, text_dat2;
+  j_button_data back_button_dat;
+  j_button_data button_dats[4];
+  j_component *button_components[5]; // 4 buttons + 1 back button
+  j_component *text_comp_dat, *bg_comp_dat;
+} os_theme_page_ctx;
 /*----------------------------------------------------------
             Sojourn OS Context Structs / Enums
 ----------------------------------------------------------*/
@@ -175,6 +197,8 @@ typedef union {
   os_home_screen_ctx home_screen_dat;
   os_snake_game_ctx snake_game_dat;
   os_start_up_ctx start_up_dat;
+  os_shut_down_ctx shut_down_dat;
+  os_theme_page_ctx theme_page_dat;
 } page_ctx;
 
 typedef struct {

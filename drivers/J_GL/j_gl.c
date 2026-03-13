@@ -722,8 +722,6 @@ j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, v
   ret->y = y;
   ret->dat = dat;
   ret->dat2 = dat2;
-  ret->index = 100;
-  ret->index2 = 25;
   ret->next_ptr = ret->prev_ptr = NULL;
   return ret;
 }
@@ -945,7 +943,7 @@ uint8_t remove_component_o(j_component* component) {
   
   component->prev_ptr = component->next_ptr = NULL;
 
-  return 1;
+  return ret;
 }
 
 void insert_component_o(j_component* component, j_component* og_component) {

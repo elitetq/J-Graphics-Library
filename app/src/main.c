@@ -26,8 +26,6 @@
 
 // LOW_HEIGHT - MAX_HEIGHT - LOW_LENGTH - MAX_LENGTH
 uint16_t bounds[4] = {0x0000,LCD_MAX_HEIGHT,0x0000,LCD_MAX_LENGTH};
-static uint8_t column_array[4] = {(uint8_t)(0x0000>>8),(uint8_t)0x0000,(uint8_t)(LCD_MAX_HEIGHT>>8),(uint8_t)LCD_MAX_HEIGHT};
-static uint8_t row_array[4] = {(uint8_t)(0x0000>>8),(uint8_t)0x0000,(uint8_t)(LCD_MAX_LENGTH>>8),(uint8_t)(LCD_MAX_LENGTH)};
 
 const struct gpio_dt_spec dcx_gpio = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE,dcx_gpios);
 const struct spi_cs_control cs_ctrl = (struct spi_cs_control) {

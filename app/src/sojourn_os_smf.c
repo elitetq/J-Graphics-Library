@@ -20,6 +20,8 @@ static const struct smf_state sos_states[] = {
   [SNAKE_GAME] = SMF_CREATE_STATE(snake_game_state_entry, snake_game_state_run, snake_game_state_exit, NULL, NULL),
   [SNAKE_RESET] = SMF_CREATE_STATE(snake_reset_state_entry, snake_reset_state_run, snake_reset_state_exit, NULL, NULL),
   [START_UP] = SMF_CREATE_STATE(start_up_state_entry, start_up_state_run, start_up_state_exit, NULL, NULL),
+  [SHUT_DOWN] = SMF_CREATE_STATE(shut_down_state_entry, shut_down_state_run, shut_down_state_exit, NULL, NULL),
+  [THEME_PAGE] = SMF_CREATE_STATE(theme_page_state_entry, theme_page_state_run, theme_page_state_exit, NULL, NULL),
 };
 static os_state_ctx sos_object;
 static uint16_t x, y;
@@ -42,7 +44,7 @@ void state_machine_init() {
   draw_color_fs(BLACK);
   set_theme(VOID);
   sos_object.os_flags = 0b10000000;
-  smf_set_initial(SMF_CTX(&sos_object),&sos_states[START_UP]);
+  smf_set_initial(SMF_CTX(&sos_object),&sos_states[SHUT_DOWN]);
 }
 
 int state_machine_run() {
@@ -53,6 +55,109 @@ int state_machine_run() {
 /*----------------------------------------------------------
                 State Function Definitions
 ----------------------------------------------------------*/
+static void theme_page_state_entry(void* o) {
+  os_state_ctx* ctx = (os_state_ctx*)o;
+  memset(&ctx->page_dat,0,sizeof(os_theme_page_ctx));
+  os_theme_page_ctx* page_dat = (os_theme_page_ctx*)&ctx->page_dat.theme_page_dat;
+
+  page_dat->bg_comp_dat = create_component("bg comp",J_FILL,0,0,&J_STYLE_BG_COL,NULL);
+// 
+  page_dat->num_buttons = 4;
+
+  for(int i = 0; i < page_dat->num_buttons; i++) {
+    page_dat->button_dats[i] = (j_button_data){.bg_col = J_STYLE_COL, .col = J_STYLE_BG_COL, .border_col = J_STYLE_ACCENT_COL, .border_width = 2, .decal_dat = NULL, .font_size = FONT_MEDIUM, .height = 40, .length = 200, .pressed_status = 0, .tag = i};
+    page_dat->button_components[i] = create_component("button",J_BUTTON,20,10+(45*i),"",&page_dat->button_dats[i]);
+  }
+
+  page_dat->button_components[0]->dat = (void*)"Void";
+  page_dat->button_components[1]->dat = (void*)"Diamond";
+  page_dat->button_components[2]->dat = (void*)"Amethyst";
+  page_dat->button_components[3]->dat = (void*)"Dust";
+
+  page_dat->back_button_dat = J_STYLE_BUTTON_SQUARE_SMALL(icon_arrow_left_tail_decal,FONT_SMALL);
+  page_dat->back_button_dat.tag = page_dat->num_buttons; // always one more than the buttons
+  page_dat->button_components[4] = create_component("back_button",J_BUTTON,5,270,"",&page_dat->back_button_dat);
+
+  add_component_o(page_dat->bg_comp_dat);
+  for(int i = 0; i < page_dat->num_buttons + 1; i++) {
+    add_component_o(page_dat->button_components[i]);
+  }
+
+  draw_screen_o(NULL,0);
+}
+
+
+static enum smf_state_result theme_page_state_run(void* o) {
+  os_state_ctx* ctx = (os_state_ctx*)o;
+  os_theme_page_ctx* page_dat = (os_theme_page_ctx*)&ctx->page_dat.theme_page_dat;
+
+  poll_touch(&x,&y);
+  j_component* PRESSED_BUTTON = lcd_check_button_pressed(x,y,2);
+  if(press_button_visual(PRESSED_BUTTON)) {
+    if(PRESSED_BUTTON->dat == NULL) return SMF_EVENT_HANDLED;
+    j_button_data* button_dat = (j_button_data*)PRESSED_BUTTON->dat2;
+    switch(button_dat->tag) {
+      case 0: // Void
+        set_theme(VOID);
+        break;
+      case 1:
+        set_theme(DIAMOND);
+        break;
+      case 2:
+        set_theme(AMETHYST);
+        break;
+      case 3:
+        set_theme(DUST);
+        break;
+      case 4:
+        smf_set_state(SMF_CTX(&sos_object),&sos_states[HOME_SCREEN]);
+        return SMF_EVENT_HANDLED;
+        break;
+    }
+    for(int i = 0; i < page_dat->num_buttons; i++) {
+      page_dat->button_dats[i].col = J_STYLE_BG_COL;
+      page_dat->button_dats[i].bg_col = J_STYLE_COL;
+      page_dat->button_dats[i].border_col = J_STYLE_ACCENT_COL;
+    }
+    page_dat->back_button_dat.col = J_STYLE_BG_COL;
+    page_dat->back_button_dat.bg_col = J_STYLE_COL;
+    page_dat->back_button_dat.border_col = J_STYLE_ACCENT_COL;
+    draw_screen_o(NULL,0);
+  }
+  return SMF_EVENT_HANDLED;
+}
+
+static void theme_page_state_exit(void* o) {
+  clear_draw_buffer();
+}
+
+static void shut_down_state_entry(void* o) {
+  os_state_ctx* ctx = (os_state_ctx*)o;
+  memset(&ctx->page_dat,0,sizeof(os_shut_down_ctx));
+  os_shut_down_ctx* page_dat = (os_shut_down_ctx*)&ctx->page_dat.shut_down_dat;
+
+  page_dat->bg_comp_dat = create_component("bg comp",J_FILL,0,0,&J_STYLE_BG_COL,NULL);
+
+  page_dat->text_dat = (j_text_data){.bg_col = J_STYLE_BG_COL, .centering = J_CENTER, .col = J_STYLE_COL, .font_size = FONT_SMALL};
+
+  page_dat->text_comp_dat = create_component("text comp",J_TEXT,120,160,"Press anywhere to start up...",&page_dat->text_dat);
+
+  add_component_o(page_dat->bg_comp_dat);
+  add_component_o(page_dat->text_comp_dat);
+
+  draw_screen_o(NULL,0);
+}
+
+static enum smf_state_result shut_down_state_run(void* o) {
+  poll_touch(&x,&y);
+  smf_set_state(SMF_CTX(&sos_object),&sos_states[START_UP]);
+  return SMF_EVENT_HANDLED;
+}
+
+static void shut_down_state_exit(void* o) {
+  clear_draw_buffer();
+}
+
 static void start_up_state_entry(void* o) {
   os_state_ctx* ctx = (os_state_ctx*)o;
   memset(&ctx->page_dat,0,sizeof(os_start_up_ctx));
@@ -79,6 +184,7 @@ static void start_up_state_entry(void* o) {
   add_component_o(page_dat->bg_comp_dat);
   add_component_o(page_dat->loading_bar_comp_dat);
   add_component_o(page_dat->logo_comp_dat);
+  draw_component(page_dat->bg_comp_dat);
   draw_component(page_dat->logo_comp_dat);
   page_dat->logo_comp_dat->y = 160-75;
   page_dat->logo_comp_dat->dat2 = NULL; // Clear animation data
@@ -445,6 +551,34 @@ static enum smf_state_result snake_game_state_run(void* o) {
     *dir_global = *cur_dir;
   }
   draw_eyes(page_dat,&page_dat->cur_x,&page_dat->cur_y);
+  if(page_dat->snake_len >= 100) {
+    // Win condition
+    page_dat->bg_decal_dat1.col = WHITE;
+    page_dat->bg_decal_dat1.bg_col = GRAY;
+    remove_component_o(page_dat->button_comp_down);
+    remove_component_o(page_dat->button_comp_up);
+    remove_component_o(page_dat->button_comp_left);
+    remove_component_o(page_dat->button_comp_right);
+    add_component_o(page_dat->announce_but_comp_dat1);
+    add_component_o(page_dat->announce_but_comp_dat2);
+    add_component_o(page_dat->announce_bg_comp_dat);
+    page_dat->announce_bg_comp_dat->dat = (void*)"You win! Try again?";
+    draw_screen_o(NULL,0);
+    redraw_snake(page_dat,YELLOW);
+
+    poll_touch(&x,&y);
+    j_component* PRESSED_BUTTON = lcd_check_button_pressed(x,y,8);
+    if(press_button_visual(PRESSED_BUTTON)) {
+      if(PRESSED_BUTTON->name[0] == 'R') { // Retry
+        smf_set_state(SMF_CTX(&sos_object),&sos_states[SNAKE_RESET]);
+        return SMF_EVENT_HANDLED;
+      } else {
+        smf_set_state(SMF_CTX(&sos_object),&sos_states[HOME_SCREEN]);
+        return SMF_EVENT_HANDLED;
+      }
+    }
+    return SMF_EVENT_HANDLED;
+  }
 
   (*p)++;
   if(*p > 6) *pellet_flag = false;
@@ -519,7 +653,7 @@ static void lock_screen_state_entry(void* o) {
   
   char *pos_strings[] = {"Enter a new password...", "Enter password to unlock..."};
   bool is_locked = (ctx->os_flags & 0x80) != 0x50;
-  char* status_string = pos_strings[!is_locked];
+  char* status_string = pos_strings[!(ctx->os_flags & 0x80)];
 
   page_dat->cur_number_index = 0; // Set the current number of the password number index to 0.
 
@@ -663,8 +797,8 @@ static void about_page_state_entry(void* o) {
   page_dat->decal_dat = J_STYLE_DECAL_DEFAULT;
 
   j_component* FILL = create_component("bg_col",J_FILL,0,0,&J_STYLE_BG_COL,NULL);
-  j_component* BANNER_DECAL = create_component("banner_decal",J_DECAL,0,0,banner_gui_decal,NULL);
-  j_component* PLANET_DECAL = create_component("planet_decal",J_DECAL,0,220,planet_gui_decal,NULL);
+  j_component* BANNER_DECAL = create_component("banner_decal",J_DECAL,0,0,banner_gui_decal,&page_dat->decal_dat);
+  j_component* PLANET_DECAL = create_component("planet_decal",J_DECAL,0,220,planet_gui_decal,&page_dat->decal_dat);
   j_component* SOJOURN_DECAL = create_component("sojourn_logo",J_DECAL,30,100,logo_text_gui_decal,&page_dat->decal_dat);
   j_component* BACK_BUTTON = create_component("back_button",J_BUTTON,10,4,"",&page_dat->button_dat_1);
   j_component* TEXT = create_component("credit text1",J_TEXT,120,160,"Everything you see is",&page_dat->text_dat);
@@ -852,6 +986,10 @@ void set_theme(sos_themes theme) {
     case DUST:
       sos_object.global_col = DARK_GRAY; sos_object.global_bg_col = SAND; sos_object.global_accent_col = TERRACOTTA;
       sos_object.confirm_col = TERRACOTTA; sos_object.error_col = TERRACOTTA;
+      break;
+    case AMETHYST:
+      sos_object.global_col = AMETHYST_PURPLE_LIGHT; sos_object.global_bg_col = AMETHYST_PURPLE; sos_object.global_accent_col = WHITE;
+      sos_object.confirm_col = MAGENTA; sos_object.error_col = MAGENTA;
       break;
     default:
       sos_object.global_col = WHITE; sos_object.global_bg_col = BLACK; sos_object.global_accent_col = WHITE;

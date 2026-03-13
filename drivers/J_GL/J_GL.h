@@ -104,7 +104,9 @@ typedef enum {
   TERRACOTTA = 0x00E36A6A,
   DARK_GRAY = 0x00424242,
   DIAMOND_BLUE = 0x002B94FC,
-  DARK_GREEN = 0x0000bd00
+  DARK_GREEN = 0x0000bd00,
+  AMETHYST_PURPLE = 0x00A539EF,
+  AMETHYST_PURPLE_LIGHT = 0x00DBD6FF
 } j_color;
 
 
@@ -168,7 +170,6 @@ struct j_component {
   uint16_t x, y;
   void* dat; // Often used for direct data, such as text contents or image data.
   void* dat2; // Often used for cosmetic data, such as colors, size, etc...
-  uint8_t index, index2;
   j_component* next_ptr;
   j_component* prev_ptr;
 };
@@ -191,11 +192,11 @@ typedef struct {
 typedef struct {
   j_color col, bg_col, border_col;
   j_font_size font_size;
-  int8_t tag; // Used for grouping certain buttons together
-  uint8_t border_width, pressed_status; // Pressed_status is not pressed (0) and pressed (1)
+  int8_t tag; // Used for grouping and finding certain buttons together in code
+  uint8_t border_width, pressed_status; // Pressed_status is not pressed (0) and pressed (1). When initializing, set this to 0. (or 1 if you really want to)
   uint16_t length, height;
   uint8_t* decal_dat; // set to decal for decal writing, or NULL for text
-  j_component* decal_ptr;
+  j_component* decal_ptr; // Do not work with this or modify this, this is set by the code automatically
 } j_button_data;
 
 typedef struct {
@@ -310,7 +311,20 @@ j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, v
 // void change_component_index(j_component* component, uint8_t new_index);
 // void print_components();
 
+/**
+ * @brief Will add a component to the screen array, will not draw
+ * 
+ * @param component component pointer to be added
+ */
 void add_component_o(j_component* component);
+
+/**
+ * @brief Remove component from screen array
+ * 
+ * @param component component pointer to be removed
+ * 
+ * @return 1 for success, 0 for failure
+ */
 uint8_t remove_component_o(j_component* component);
 
 /**
@@ -322,7 +336,7 @@ uint8_t remove_component_o(j_component* component);
 void change_component_index_o(j_component* component, uint8_t new_index);
 
 /**
- * @brief Displays the current components on the screen
+ * @brief Prints the current components on the screen to the serial monitor
  * 
  */
 void print_components_o();
@@ -359,6 +373,16 @@ void draw_component(j_component* component);
  */
 j_component* lcd_check_button_pressed(uint16_t x, uint16_t y, uint8_t buffer_amt);
 
+/**
+ * @brief Will check which button currently on the screen list is pressed. Looks only for the tag_filter in the j_button_data you choose
+ * 
+ * @param x X coordinate you want to check for
+ * @param y Y coordinate you watn to check for
+ * @param buffer_amt The amount of slack you want to allow from the buttons set bounds, higher means each button has more area to "click"
+ * @param tag_filter Button tag to filter for
+ * 
+ * @return j_component struct pointer of the first button that (x,y) are found within the bounds of, given the tag filter
+ */
 j_component* lcd_check_button_pressed_filter(uint16_t x, uint16_t y, uint8_t buffer_amt, int8_t tag_filter);
 
 /**
@@ -379,15 +403,23 @@ uint8_t press_button_visual(j_component* button);
 void update_text(j_component* text_component, char* new_str);
 
 /**
- * @brief Blocking function. Polls for the first instance of a touch on the screen, and returns x/y coordinates
+ * @brief Blocking function. Polls for the first instance of a touch on the screen, and returns x/y coordinates to the pointers
  * 
  * @param x X coordinate return value
  * @param y Y coordinate return value 
  */
 void poll_touch(uint16_t* x, uint16_t* y);
 
+/**
+ * @brief Blocking function. Polls for the first instance of a touch on the screen, and returns x/y coordinates. Has a timeout so that it isnt polling forever
+ * 
+ * @param x X coordinate return value
+ * @param y Y coordinate return value 
+ * @param timeout Time before the poll_touch returns, will only poll for this amount of time (ms)
+ */
 int poll_touch_timeout(uint16_t* x, uint16_t* y, int timeout);
 
+// Frees the heap memory used by a component, as well as any other heap memory that its data components may have
 void free_component(j_component* comp);
 
 #endif
