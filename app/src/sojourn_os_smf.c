@@ -7,9 +7,6 @@ extern const struct device *dev_i2c;
 extern const struct spi_config spi_cfg;
 extern uint16_t bounds[4];
 
-
-
-
 /*---------------------------------------------------------
                      Local Variables
 ----------------------------------------------------------*/
@@ -324,6 +321,7 @@ void int_to_str(int num, char* str_ret, int max_len) {
   str_ret[index] = 0; // Null operator
 }
 
+// Draw specified tile on the coordinates
 void sg_draw_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l, sg_tile tile_info) {
   if(*x_l < 1 || *x_l > 10 || *y_l < 1 || *y_l > 10) return;
   printk("Tryna print\n");
@@ -346,6 +344,7 @@ void sg_draw_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l, sg_t
   }
 }
 
+// Will clear the coords with the background
 void sg_clear_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
   if(*x_l < 1 || *x_l > 10 || *y_l < 1 || *y_l > 10) return;
   uint16_t x_r, y_r;
@@ -363,6 +362,7 @@ void sg_clear_coords(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
   shape_dat->col = old_col;
 }
 
+// Redraw the sanke with given color
 void redraw_snake(os_snake_game_ctx* dat_ptr, j_color col) {
   j_shape_data *shape_dat = &dat_ptr->shape_dat;
   uint8_t *game_array = dat_ptr->game_array;
@@ -379,6 +379,7 @@ void redraw_snake(os_snake_game_ctx* dat_ptr, j_color col) {
   shape_dat->col = prev_col;
 }
 
+// Draw eyes of snake (CUTE)
 void draw_eyes(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
   uint8_t x_r = dat_ptr->x_board_offset + 20*(*x_l-1); // Find local x and y coordinates
   uint8_t y_r = dat_ptr->y_board_offset + 20*(*y_l-1);
@@ -395,6 +396,7 @@ void draw_eyes(os_snake_game_ctx* dat_ptr, uint8_t *x_l, uint8_t *y_l) {
   draw_component(comp);
 }
 
+// Generate pellet in a random spot
 void sg_generate_pellet(os_snake_game_ctx* dat_ptr) {
   if(99 - dat_ptr->snake_len - dat_ptr->pellet_amt <= 0) return; // not enough space
 
@@ -417,7 +419,7 @@ void sg_generate_pellet(os_snake_game_ctx* dat_ptr) {
     }
   }
   while(dat_ptr->game_array[local_i]) {
-    printk("FAILED\n");
+    printk("FAILED\n"); // This ideally should never be reached, but it prevents a crash if the pellet creation fails
   }
   dat_ptr->temp_pellet_x = SG_INDEX_TO_X_COORD(local_i);
   dat_ptr->temp_pellet_y = SG_INDEX_TO_Y_COORD(local_i);
@@ -553,6 +555,7 @@ static enum smf_state_result snake_game_state_run(void* o) {
     *dir_global = *cur_dir;
   }
   draw_eyes(page_dat,&page_dat->cur_x,&page_dat->cur_y);
+
   if(page_dat->snake_len >= 100) {
     // Win condition
     page_dat->bg_decal_dat1.col = WHITE;
@@ -742,7 +745,7 @@ static enum smf_state_result lock_screen_state_run(void* o) {
 
 
     } else {
-      for(int i = 0; i < 6; i++) {
+      for(int i = 0; i < 6; i++) { // Check password
         printk("Comparing %d with %d\n",local_password[i],ctx->password[i]);
         if(local_password[i] != ctx->password[i]) {
           page_dat->message_dat.col = J_STYLE_ERROR_COL;
@@ -765,7 +768,6 @@ static enum smf_state_result lock_screen_state_run(void* o) {
       draw_component(page_dat->message_comp_ptr);
       k_msleep(2000);
 
-      printk("Entered correct\n");
       // If not first time, and correct password is input, code will end up here
       smf_set_state(SMF_CTX(&sos_object),&sos_states[HOME_SCREEN]);
     }
@@ -778,8 +780,6 @@ static void lock_screen_state_exit(void* o) {
   os_lock_screen_ctx* page_dat = &ctx->page_dat.lock_screen_dat;
   add_component_o(page_dat->shape);
   add_component_o(page_dat->message_comp_ptr);
-  // free_component(page_dat->shape);
-  // free_component(page_dat->message_comp_ptr);
   clear_draw_buffer();
   printk("EXITING LOCK SCREEN\n\n");
 }
@@ -837,13 +837,14 @@ static void home_screen_state_entry(void* o) {
   memset(&ctx->page_dat,0,sizeof(os_home_screen_ctx));
   os_home_screen_ctx* page_dat = &ctx->page_dat.home_screen_dat;
 
+  // Set app color theme based on the OS color theme
   page_dat->app1 = J_STYLE_BUTTON_DECAL(global_theme ? J_STYLE_ACCENT_COL : MAGENTA, J_STYLE_COL,app_whatsyapp_icon,64,64);
   page_dat->app2 = J_STYLE_BUTTON_DECAL(global_theme ? J_STYLE_ACCENT_COL : ORANGE, J_STYLE_COL,app_calc_icon,64,64);
   page_dat->app3 = J_STYLE_BUTTON_DECAL(global_theme ? J_STYLE_ACCENT_COL : GREEN, J_STYLE_COL,app_snake_icon,64,64);
 
   // Context menu data
   page_dat->ctx_menu_dat = (j_button_data){.bg_col = J_STYLE_BG_COL, .border_col = J_STYLE_ACCENT_COL, .col = J_STYLE_BG_COL, .border_width = 2, .decal_dat = NULL, .font_size = FONT_SMALL, .height = 80, .length = 140, .pressed_status = 0, .tag = 0};
-  page_dat->ctx_menu_button_dat = (j_button_data){.bg_col = J_STYLE_BG_COL, .border_col = J_STYLE_ACCENT_COL, .col = J_STYLE_COL, .border_width = 2, .decal_dat = NULL, .font_size = FONT_MEDIUM, .height = 40, .length = 140, .pressed_status = 0, .tag = 1};
+  // page_dat->ctx_menu_button_dat = (j_button_data){.bg_col = J_STYLE_BG_COL, .border_col = J_STYLE_ACCENT_COL, .col = J_STYLE_COL, .border_width = 2, .decal_dat = NULL, .font_size = FONT_MEDIUM, .height = 40, .length = 140, .pressed_status = 0, .tag = 1};
 
   page_dat->ctx_menu_background = create_component("ctx_bg",J_BUTTON,10,35,"",&page_dat->ctx_menu_dat);
   page_dat->ctx_button1 = create_component("ctx_themes_but",J_BUTTON,10,35,"",&page_dat->ctx_menu_button_dat);
@@ -892,7 +893,6 @@ static void home_screen_state_entry(void* o) {
 }
 
 static enum smf_state_result home_screen_state_run(void* o) {
-  printk("WAAAAT\n");
   static char* ctx_strings[4] = {"Themes","About","Shut down","Sign out"};
   os_state_ctx* ctx = (os_state_ctx*)o;
   os_home_screen_ctx* page_dat = &ctx->page_dat.home_screen_dat;
@@ -969,7 +969,6 @@ static void home_screen_state_exit(void* o) {
   add_component_o(page_dat->ctx_button1);
   add_component_o(page_dat->ctx_button2);
   clear_draw_buffer();
-  printk("All good!");
   printk("Exiting home...\n\n\n");
 }
 
