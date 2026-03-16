@@ -154,7 +154,7 @@ The majority of the work happens with the `dat` and `dat2` void pointers. These 
 
 ### J_DECAL
 + `dat`: Needs to be a pointer to a `uint8_t` array of decal data, generated using the custom `cnv_to_bitmap.py` script seen in this repo. This is explained further in **1.5**.
-+ `dat2`: Always set to `NULL`. Unlike `J_IMAGE`, `J_DECAL`'s are not compatible with animations. They are designed to be lightweight alternatives to IMAGES
++ `dat2`: Needs to be a pointer to 'j_decal_data' struct or a 'NULL' pointer, which sets the data to the default decal data.
 
 ### J_BAR
 + `dat`: Needs to be a pointer to a `uint8_t` variable. This will be the value used to fill the bar. It needs to be within the range of 0 to 100 at all times.
