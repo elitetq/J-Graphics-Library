@@ -240,11 +240,6 @@ Also, the name of your generated array can be anything, it just helps you set th
 
 The python code will generate a `<page_to_image>-converted.txt` file in the same directory as where you run your python script. This will contain your converted array, which you can copy and paste into your code. It is important that you use the keyword `const` when declaring these variables (automatically done for you) because they will be stored in Flash memory. The J_GL library automatically loads these into ram for efficient drawing when necessary.
 
-## Roadmap for J Graphics Library
-
-+ SOON: Fix up the printk statements, currently your serial monitor is bombarded with random debug messages lol. Ill fix that as soon as I have time.
-+ April 2026: Comprehensive shapes, such as circles, triangles, hexagons, etc...
-
 
 # 2 | SojournOS (Application)
 
