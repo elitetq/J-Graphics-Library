@@ -146,7 +146,7 @@ And you are done, you may begin using the library and all of its functions!
 The basics of this library are summed up below, for a more comprehensive guide, you can study the code of this github.
 
 ## 1.2 | How to create a component
-Components can any of the following types: `J_BUTTON`, `J_SHAPE`, `J_TEXT`, `J_IMAGE`, `J_DECAL`, `J_BAR`, and `J_FILL`.
+Components can be any of the following types: `J_BUTTON`, `J_SHAPE`, `J_TEXT`, `J_IMAGE`, `J_DECAL`, `J_BAR`, and `J_FILL`.
 
 For `J_SHAPE`, the only currently working shape is RECTANGLE. So be aware that triangles or circles will not work (coming in a future update).
 
@@ -228,7 +228,7 @@ Every component you create is allocated on the heap. Call `clear_draw_buffer()` 
 If you want to remove a singular component, it is still recommended to use this method. A good strategy is to use the `remove_component_o(j_component* component)` and then redraw the screen. When you want to deallocate everything, you would use `add_component_o(j_component* component)` to bring this component back in and `clear_draw_buffer()` to deallocate everything.
 
 ### Recommendation
-My recommendation is to use Zephyrs State Machines for this library, they work well with the State Machine pipeline and can be implemented generally like this for each state function.
+My recommendation is to use Zephyr's State Machines for this library, they work well with the State Machine pipeline and can be implemented generally like this for each state function.
 
 ```c
 
@@ -243,7 +243,7 @@ void state_1_run(void* o) {
 }
 
 void state_1_exit(void* o) {
-    // IMPORTANT: Make sure you add EVERY initialized component (not on the draw buffer, and that you have also not already deallocated) to the draw array using add_component_o(j_component* component) and then use clear_draw_buffer() to deallocate everything. OR you can deallocate eavrything yourself manually using the library defined free_component(j_component* component)
+    // IMPORTANT: Make sure you add EVERY initialized component (not on the draw buffer, and that you have also not already deallocated) to the draw array using add_component_o(j_component* component) and then use clear_draw_buffer() to deallocate everything. OR you can deallocate everything yourself manually using the library defined free_component(j_component* component)
 }
 
 ```
@@ -276,7 +276,7 @@ Use the terminal to run these applications, as they both require two arguments, 
 `python cnv_to_bitmap.py <path_to_image> <name_of_generated_array>`
 
 Install the converters' dependencies with `python -m pip install imageio numpy matplotlib`. Use an RGB PNG input; the scripts index RGB channels and strip a four-character extension when naming the output.
-Also, the name of your generated array can be anything, it just helps you set the name as you convert instead of needing to do it yourself everytime.
+Also, the name of your generated array can be anything, it just helps you set the name as you convert instead of needing to do it yourself every time.
 
 The python code will generate a `<path_to_image_without_extension>-converted.txt` file next to the input image. This will contain your converted array, which you can copy and paste into your code. It is important that you use the keyword `const` when declaring these variables (automatically done for you) because they will be stored in Flash memory. The J_GL library automatically loads these into ram for efficient drawing when necessary.
 
