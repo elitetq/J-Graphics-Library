@@ -1,7 +1,36 @@
-[SojournOS + Graphics Library]
+# SojournOS + J Graphics Library
 
 # Overview
 This GitHub features a rudimentary OS - named SojournOS - designed to showcase the custom J Graphics Library, developed by Jonart Bajraktari for the 2025-26 Embedded in Embedded club. This documentation will detail technical details and implementations of the graphics library, as well as the OS details and future roadmap.
+
+## Build the SojournOS demo
+
+The repository's `west.yml` selects **Zephyr v4.2.0**. Install Git, Python/west, CMake, Ninja and a compatible Zephyr SDK using the [Zephyr setup guide](https://docs.zephyrproject.org/4.2.0/develop/getting_started/index.html). The [nRF52840 DK guide](https://docs.zephyrproject.org/4.2.0/boards/nordic/nrf52840dk/doc/index.html) covers the board and flashing tools.
+
+First, activate your Python environment and make sure west is installed. Create a new folder outside any existing west workspace, then run the following commands:
+
+```sh
+mkdir jgraphics-workspace
+cd jgraphics-workspace
+git clone https://github.com/elitetq/J-Graphics-Library.git
+west init -l J-Graphics-Library
+west update
+west zephyr-export
+python -m pip install -r zephyr/scripts/requirements.txt
+west build -p always -b nrf52840dk/nrf52840 J-Graphics-Library/app -d build -- -DDTC_OVERLAY_FILE=boards/nrf52840dk_nrf52840.overlay
+west flash -d build
+```
+
+Use the nRF52840 DK and the display described below. The overlay selects P1.11 for D/C and P1.12 for chip select; the SPI and I2C bus pins come from the board definition. Verify common ground, display power and those bus connections. After flashing, check that SojournOS draws and responds to touch. You will need to build and flash the application to check your hardware setup.
+
+## Repository layout
+
+- `app/`: SojournOS demo and board overlay.
+- `drivers/J_GL/`: graphics implementation and public header.
+- `drivers/J_ASSETS/`: fonts/assets used by the graphics library.
+- `drivers/SOJOURN_ASSETS/`: demo assets.
+- `zephyr/module.yml`: module registration for Zephyr.
+- `west.yml`: Zephyr dependency manifest.
 
 # 1 | Graphics Library (J_GL)
 The graphics library is entirely custom made, it utilizes the Zephyr RTOS for SPI and State Machines, and a custom pipeline for drawing different components.
@@ -21,7 +50,17 @@ CONFIG_I2C=y
 CONFIG_HEAP_MEM_POOL_SIZE=8192
 ```
 
-Now, you can add the `J_GL` folder in `app/drivers` to your own project. Include it in the CMake file, and use all the functions in the `.h` file.
+The graphics folder is [`drivers/J_GL`](drivers/J_GL/), and its header depends on [`drivers/J_ASSETS`](drivers/J_ASSETS/). For an existing Zephyr workspace, add this repository to your west manifest so Zephyr discovers `zephyr/module.yml`:
+
+```yaml
+# Add under manifest.projects in your existing manifest:
+- name: J-Graphics-Library
+  url: https://github.com/elitetq/J-Graphics-Library
+  revision: main
+  path: modules/j_gl
+```
+
+Run `west update`, rebuild your application, and include `<J_GL.h>`. The module's CMake files add the drivers automatically. If you want to keep the same library version, replace `main` with the commit SHA you are using. If you copy the files manually, make sure to include both J_GL and J_ASSETS in your CMake file, including their header directories.
 
 There are **three** important things to note:
 + This library is designed to be compatible with the Adafruit 2.8" 240x320 LCD TFT Display (With capacitive touch)
@@ -47,6 +86,7 @@ arduino_spi {
 Now add these includes to your main.c
 
 ```c
+#include <J_GL.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
@@ -115,7 +155,7 @@ Each component has the same structure properties. That is shown below:
 struct j_component {
   char* name; // Name of component, used for keeping track
   j_type type; // Type of component, as mentioned above
-  uint16_t x, y; // x and y coordinates
+  int16_t x, y, tag; // Signed coordinates and component tag
   void* dat; // Often used for direct data, such as text contents or image data.
   void* dat2; // Often used for cosmetic data, such as colors, size, etc...
   // Used for tracking the components in the linked list array, you do not need to worry about this, the code logic will work with these automatically
@@ -124,7 +164,7 @@ struct j_component {
 };
 ```
 
-To create a component, you use the command `j_component* create_component(char* name, j_type type, uint16_t x, uint16_t y, void* dat, void* dat2);`, this will return a pointer to a j_component, keep track of this, as you can use this to modify your components later, as well as draw them to the screen.
+To create a component, you use the command `j_component* create_component(char* name, j_type type, int16_t x, int16_t y, void* dat, void* dat2);`, this will return a pointer to a j_component, keep track of this, as you can use this to modify your components later, as well as draw them to the screen.
 
 To add a component to the screen array, you can use `void add_component_o(j_component* component);`. It is important to note that when adding multiple components, the most recently added component will be prioritized on the foreground when drawn.
 
@@ -183,7 +223,7 @@ The screen drawing pipeline will iteratively go through the entire linked list c
 
 ### Removing all components from screen. (Deallocation)
 (See **1.2** for function definitions)
-Every component you create is allocated on the heap. Thus it is very important that you deallocate them when not in use. The J_GL library automatically does this for you, provided you have added the components to the screen buffer via `add_component_o(j_component* component)`. You simply need to call the `void clear_draw_buffer();` command, and it will take care of deallocating every component on the heap.
+Every component you create is allocated on the heap. Call `clear_draw_buffer()` to free the components currently in the draw list. Components removed from that list must be freed separately with `free_component()`, or re-added before clearing the list. Note that `dat` and `dat2` still point to your own data. Keep that data in memory while the component is being used, and free any memory you allocated yourself when you are done with it.
 
 If you want to remove a singular component, it is still recommended to use this method. A good strategy is to use the `remove_component_o(j_component* component)` and then redraw the screen. When you want to deallocate everything, you would use `add_component_o(j_component* component)` to bring this component back in and `clear_draw_buffer()` to deallocate everything.
 
@@ -235,10 +275,10 @@ Use the terminal to run these applications, as they both require two arguments, 
 `python cnv_to_bit.py <path_to_image> <name_of_generated_array>`
 `python cnv_to_bitmap.py <path_to_image> <name_of_generated_array>`
 
-Note that your path_to_image must end with .png or any image format.
+Install the converters' dependencies with `python -m pip install imageio numpy matplotlib`. Use an RGB PNG input; the scripts index RGB channels and strip a four-character extension when naming the output.
 Also, the name of your generated array can be anything, it just helps you set the name as you convert instead of needing to do it yourself everytime.
 
-The python code will generate a `<page_to_image>-converted.txt` file in the same directory as where you run your python script. This will contain your converted array, which you can copy and paste into your code. It is important that you use the keyword `const` when declaring these variables (automatically done for you) because they will be stored in Flash memory. The J_GL library automatically loads these into ram for efficient drawing when necessary.
+The python code will generate a `<path_to_image_without_extension>-converted.txt` file next to the input image. This will contain your converted array, which you can copy and paste into your code. It is important that you use the keyword `const` when declaring these variables (automatically done for you) because they will be stored in Flash memory. The J_GL library automatically loads these into ram for efficient drawing when necessary.
 
 
 # 2 | SojournOS (Application)
@@ -247,7 +287,11 @@ This is SojournOS, a passion project made by Jonart Bajraktari to showcase J_GL 
 
 ## Roadmap for SojournOS
 
-+ May 2026: Whatsyapp - The bluetooth messaging app - and Calculator - do I need to explain this one?
++ Whatsyapp, a Bluetooth messaging app, and a calculator. These are planned features, with no release date set.
 
 
 Thanks for reading! I hope you enjoy the library and/or the basic OS I have made.
+
+## License
+
+See [LICENSE](LICENSE) and [ZEPHYR_LICENSE](ZEPHYR_LICENSE) for the license texts included in this repository.
